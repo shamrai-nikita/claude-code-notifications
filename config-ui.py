@@ -49,6 +49,7 @@ EVENT_META = {
 EVENT_ORDER = ["permission_request", "elicitation_dialog", "stop"]
 
 DEFAULT_CONFIG = {
+    "global_enabled": True,
     "events": {
         "permission_request": {"enabled": True, "sound": "Funk", "volume": 7, "style": "persistent", "sound_enabled": True},
         "elicitation_dialog": {"enabled": True, "sound": "Glass", "volume": 7, "style": "persistent", "sound_enabled": True},
@@ -291,6 +292,32 @@ HTML_PAGE = r"""<!DOCTYPE html>
     margin: 1.5rem 0;
   }
 
+  /* Global toggle bar */
+  .global-toggle-bar {
+    background: white;
+    border: 2px solid var(--orange-light);
+    border-radius: 0.75rem;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.25rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .global-toggle-bar .global-label {
+    font-weight: 600;
+    font-size: 1rem;
+  }
+  .global-toggle-bar .global-sublabel {
+    font-size: 0.8125rem;
+    color: var(--gray-500);
+    margin-top: 0.125rem;
+  }
+  .global-disabled .card {
+    opacity: 0.45;
+    pointer-events: none;
+  }
+
   /* Dark theme */
   [data-theme="dark"] {
     --gray-50: #0f1117;
@@ -306,6 +333,10 @@ HTML_PAGE = r"""<!DOCTYPE html>
   }
   [data-theme="dark"] .card {
     background: #1e2130;
+  }
+  [data-theme="dark"] .global-toggle-bar {
+    background: #1e2130;
+    border-color: #5a3d30;
   }
   [data-theme="dark"] select {
     background: #161825;
@@ -415,11 +446,31 @@ function setEventVal(key, field, value) {
   config.events[key][field] = value;
 }
 
+function toggleGlobal(checked) {
+  config.global_enabled = checked;
+  render();
+}
+
 function render() {
   const app = document.getElementById('app');
+  const globalOn = config.global_enabled !== undefined ? config.global_enabled : true;
   let html = '';
 
-  // Event cards
+  // Global toggle bar
+  html += `<div class="global-toggle-bar">
+    <div>
+      <div class="global-label">Enable Notifications</div>
+      <div class="global-sublabel">Master switch for all notifications</div>
+    </div>
+    <label class="toggle">
+      <input type="checkbox" ${globalOn?'checked':''} onchange="toggleGlobal(this.checked)">
+      <span class="slider"></span>
+    </label>
+  </div>`;
+
+  // Event cards (wrapped in container for global disable)
+  html += `<div class="${globalOn?'':'global-disabled'}">`;
+
   for (const key of EVENT_ORDER) {
     const meta = EVENT_META[key] || {label: key, description: ''};
     const enabled = getEventVal(key, 'enabled');
@@ -482,6 +533,8 @@ function render() {
       </div>
     </div>`;
   }
+
+  html += `</div>`; // close global-disabled wrapper
 
   html += `<div class="save-area">
     <button class="btn-save" onclick="saveConfig()">Save Settings</button>
