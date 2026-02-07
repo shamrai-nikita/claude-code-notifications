@@ -7,6 +7,7 @@ Native macOS notification system for Claude Code. Shows notifications with Claud
 ```
 ~/.claude/
 ├── notify.sh                       # Main script — hook handler
+├── notify-click.sh                 # Click handler — activates terminal + switches tab
 ├── notify-config.json              # User config (sounds, volume, style, enable/disable per event)
 ├── config-ui.py                    # Browser-based settings UI (python3, zero deps, auto-shutdown)
 ├── Configure Notifications.command # Double-click to open settings UI
@@ -41,7 +42,14 @@ The script reads JSON from stdin (hook event data), loads `notify-config.json`, 
 4. Sends notification via the selected `ClaudeNotifier*.app`
 5. Plays sound via `afplay` at configured volume
 
-Clicking a notification opens Warp terminal (`dev.warp.Warp-Stable`).
+Clicking a notification activates the terminal and switches to the correct tab. The terminal is auto-detected from `$TERM_PROGRAM`:
+
+| `$TERM_PROGRAM` | Terminal | Tab switching |
+|---|---|---|
+| `WarpTerminal` | Warp | App-level only (no AppleScript support) |
+| `iTerm.app` | iTerm2 | Full — switches to exact session tab via AppleScript |
+| `Apple_Terminal` | Terminal.app | Full — focuses window by TTY via AppleScript |
+| Other/missing | Detected app or none | App-level only |
 
 ## Key design decisions
 
@@ -51,6 +59,8 @@ Clicking a notification opens Warp terminal (`dev.warp.Warp-Stable`).
 - **Legacy fallback**: If the selected variant app doesn't exist, `notify.sh` falls back to the legacy single `ClaudeNotifier.app` for backward compatibility.
 - **Custom app bundles**: macOS locks notification icon to the sending app. `-appIcon` flag doesn't work on modern macOS. Solution: copy `terminal-notifier.app`, change bundle ID/name/icon.
 - **Alert style**: Set via `NSUserNotificationAlertStyle` in Info.plist (`alert` for persistent, `banner` for banner). User must also configure in System Settings > Notifications.
+- **Terminal auto-detection**: `notify.sh` reads `$TERM_PROGRAM` to detect the terminal and captures a tab identifier (iTerm2 session ID, Terminal.app TTY). On click, `notify-click.sh` uses AppleScript to switch to the exact tab. Warp lacks AppleScript tab support, so only app-level activation is possible.
+- **`-execute` over `-activate`**: `terminal-notifier` flags are mutually exclusive. We use `-execute` to run `notify-click.sh` on click, which both activates the app and switches tabs. Falls back to no activation flag if terminal is unknown.
 - **Single python3 call**: All JSON parsing (stdin + config file) in one python3 invocation for performance.
 - **Settings UI**: Self-contained Python 3 script (`config-ui.py`) serves a browser-based UI on localhost. Zero external dependencies.
 - **Heartbeat auto-shutdown**: The browser sends `POST /api/heartbeat` every 3s. A watchdog daemon thread waits 30s (grace period for browser to open), then exits if no heartbeat for 10s. This means closing the browser tab auto-stops the server.
@@ -125,7 +135,7 @@ This single command handles everything:
 3. Builds two `ClaudeNotifier*.app` bundles (Persistent + Banner) with Claude branding
 4. Removes legacy `ClaudeNotifier.app` if present
 5. Sends test notifications to trigger macOS permission prompts
-6. Copies `notify.sh`, `notify-config.json`, and `config-ui.py` to `~/.claude/`
+6. Copies `notify.sh`, `notify-click.sh`, `notify-config.json`, and `config-ui.py` to `~/.claude/`
 7. Installs `Configure Notifications.command` launcher to `~/.claude/`
 8. Automatically merges hooks into `~/.claude/settings.json` (creates if missing, preserves existing settings)
 
@@ -145,7 +155,7 @@ Removes all notification components:
 1. Removes notification hooks from `~/.claude/settings.json` (preserves all other settings)
 2. Clears delivered notifications
 3. Unregisters app bundles from LaunchServices
-4. Deletes all installed files (notify.sh, config, UI, icon, apps, launcher)
+4. Deletes all installed files (notify.sh, notify-click.sh, config, UI, icon, apps, launcher)
 5. Removes entries from Notification Center database (`com.anthropic.claude-code-notifier*`) and restarts `usernoted` so they disappear from System Settings > Notifications
 
 Does NOT remove `terminal-notifier` Homebrew package or `~/.claude/` directory. Idempotent — safe to run multiple times.
@@ -175,6 +185,7 @@ python3 ~/.claude/config-ui.py
 |---|---|
 | `CLAUDE.md` | This file — project context |
 | `notify.sh` | Main notification script (hook handler) |
+| `notify-click.sh` | Notification click handler — activates terminal + switches tab |
 | `notify-config.json` | User-editable config |
 | `config-ui.py` | Browser-based settings UI (with heartbeat auto-shutdown) |
 | `Configure Notifications.command` | Double-clickable launcher for config-ui.py |

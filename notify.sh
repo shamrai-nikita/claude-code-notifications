@@ -2,13 +2,12 @@
 # Claude Code notification handler
 # Uses custom ClaudeNotifier apps for branded notifications
 # Persistent and Banner variants for per-event alert style
-# Clicking the notification opens Warp terminal
+# Clicking the notification activates the terminal and switches to the correct tab
 # Config: ~/.claude/notify-config.json
 
 NOTIFIER_PERSISTENT="$HOME/.claude/ClaudeNotifierPersistent.app/Contents/MacOS/terminal-notifier"
 NOTIFIER_BANNER="$HOME/.claude/ClaudeNotifierBanner.app/Contents/MacOS/terminal-notifier"
 NOTIFIER_LEGACY="$HOME/.claude/ClaudeNotifier.app/Contents/MacOS/terminal-notifier"
-TERMINAL_BUNDLE="dev.warp.Warp-Stable"
 CONFIG="$HOME/.claude/notify-config.json"
 
 INPUT=$(cat)
@@ -107,13 +106,31 @@ if [ ! -x "$NOTIFIER" ]; then
   fi
 fi
 
-# Send notification — clicking it opens Warp
-"$NOTIFIER" \
-  -title "$TITLE" \
-  -message "$BODY" \
-  -activate "$TERMINAL_BUNDLE" \
-  -group "$GROUP" \
-  2>/dev/null
+# Auto-detect terminal and tab identifier from environment
+TERM_APP="${TERM_PROGRAM:-}"
+case "$TERM_APP" in
+  WarpTerminal)   TAB_ID="" ;;
+  iTerm.app)      TAB_ID="${ITERM_SESSION_ID:-}" ;;
+  Apple_Terminal)  TAB_ID="/dev/$(ps -o tty= -p $PPID 2>/dev/null | xargs)" ;;
+  *)              TAB_ID="" ;;
+esac
+
+# Send notification — clicking it activates the terminal and switches to the correct tab
+if [ -n "$TERM_APP" ]; then
+  "$NOTIFIER" \
+    -title "$TITLE" \
+    -message "$BODY" \
+    -execute "bash $HOME/.claude/notify-click.sh '$TERM_APP' '$TAB_ID'" \
+    -group "$GROUP" \
+    2>/dev/null
+else
+  # Unknown terminal — fall back to generic activation (no tab switching)
+  "$NOTIFIER" \
+    -title "$TITLE" \
+    -message "$BODY" \
+    -group "$GROUP" \
+    2>/dev/null
+fi
 
 # Play alert sound at configured volume
 afplay "/System/Library/Sounds/${SOUND}.aiff" -v "$VOLUME" &

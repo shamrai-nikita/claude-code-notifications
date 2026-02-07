@@ -142,6 +142,8 @@ else:
 echo "Installing notify.sh and config..."
 cp "$SCRIPT_DIR/notify.sh" "$CLAUDE_DIR/notify.sh"
 chmod +x "$CLAUDE_DIR/notify.sh"
+cp "$SCRIPT_DIR/notify-click.sh" "$CLAUDE_DIR/notify-click.sh"
+chmod +x "$CLAUDE_DIR/notify-click.sh"
 
 if [ ! -f "$CLAUDE_DIR/notify-config.json" ]; then
   cp "$SCRIPT_DIR/notify-config.json" "$CLAUDE_DIR/notify-config.json"

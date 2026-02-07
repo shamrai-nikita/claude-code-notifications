@@ -522,7 +522,17 @@ NOTIFIER_BANNER = os.path.expanduser(
 NOTIFIER_LEGACY = os.path.expanduser(
     "~/.claude/ClaudeNotifier.app/Contents/MacOS/terminal-notifier"
 )
-TERMINAL_BUNDLE = "dev.warp.Warp-Stable"
+
+def _detect_terminal_bundle():
+    term = os.environ.get("TERM_PROGRAM", "")
+    mapping = {
+        "WarpTerminal": "dev.warp.Warp-Stable",
+        "iTerm.app": "com.googlecode.iterm2",
+        "Apple_Terminal": "com.apple.Terminal",
+    }
+    return mapping.get(term, "dev.warp.Warp-Stable")  # fallback to Warp
+
+TERMINAL_BUNDLE = _detect_terminal_bundle()
 
 PREVIEW_TITLES = {
     "permission_request": "Claude Code - Permission Required",

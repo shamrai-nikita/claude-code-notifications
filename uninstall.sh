@@ -8,6 +8,7 @@ LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/A/Framewo
 
 FILES_TO_REMOVE=(
   "$CLAUDE_DIR/notify.sh"
+  "$CLAUDE_DIR/notify-click.sh"
   "$CLAUDE_DIR/notify-config.json"
   "$CLAUDE_DIR/config-ui.py"
   "$CLAUDE_DIR/Claude.icns"
