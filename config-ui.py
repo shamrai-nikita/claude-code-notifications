@@ -36,15 +36,7 @@ EVENT_META = {
         "label": "Permission Request",
         "description": "Fires when Claude shows a real permission dialog that needs your action.",
     },
-    "permission_prompt": {
-        "label": "Permission Prompt",
-        "description": "Fires for permission events including auto-approved ones. Usually too noisy — keep disabled.",
-    },
-    "idle_prompt": {
-        "label": "Idle Prompt",
-        "description": "Fires when Claude is idle after responding. Not when blocked. Usually too noisy.",
-    },
-    "elicitation_dialog": {
+"elicitation_dialog": {
         "label": "Question Dialog",
         "description": "Fires when Claude asks you a question and is waiting for your answer.",
     },
@@ -54,23 +46,18 @@ EVENT_META = {
     },
 }
 
-EVENT_ORDER = ["permission_request", "elicitation_dialog", "stop", "permission_prompt", "idle_prompt"]
+EVENT_ORDER = ["permission_request", "elicitation_dialog", "stop"]
 
 DEFAULT_CONFIG = {
-    "default_sound": "Funk",
-    "default_volume": 7,
-    "default_style": "persistent",
     "events": {
-        "permission_request": {"enabled": True, "sound": "Funk", "volume": 7, "style": "persistent"},
-        "permission_prompt": {"enabled": False},
-        "idle_prompt": {"enabled": False},
-        "elicitation_dialog": {"enabled": True, "sound": "Glass", "volume": 7, "style": "persistent"},
-        "stop": {"enabled": True, "sound": "Hero", "volume": 7, "style": "banner"},
+        "permission_request": {"enabled": True, "sound": "Funk", "volume": 7, "style": "persistent", "sound_enabled": True},
+        "elicitation_dialog": {"enabled": True, "sound": "Glass", "volume": 7, "style": "persistent", "sound_enabled": True},
+        "stop": {"enabled": True, "sound": "Hero", "volume": 7, "style": "banner", "sound_enabled": True},
     },
 }
 
 HTML_PAGE = r"""<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -129,13 +116,6 @@ HTML_PAGE = r"""<!DOCTYPE html>
   }
   .card-title { font-weight: 600; font-size: 1rem; }
   .card-desc { color: var(--gray-500); font-size: 0.8125rem; margin-top: 0.125rem; }
-  .defaults-title {
-    font-size: 1.125rem;
-    font-weight: 600;
-    margin-bottom: 0.125rem;
-    color: var(--gray-700);
-  }
-
   /* Toggle switch */
   .toggle {
     position: relative;
@@ -310,16 +290,103 @@ HTML_PAGE = r"""<!DOCTYPE html>
     border-top: 1px solid var(--gray-200);
     margin: 1.5rem 0;
   }
+
+  /* Dark theme */
+  [data-theme="dark"] {
+    --gray-50: #0f1117;
+    --gray-100: #1a1d27;
+    --gray-200: #2d3348;
+    --gray-300: #3d4460;
+    --gray-400: #6b7280;
+    --gray-500: #9ca3af;
+    --gray-700: #d1d5db;
+    --gray-900: #e5e7eb;
+    --green: #34d399;
+    --red: #f87171;
+  }
+  [data-theme="dark"] .card {
+    background: #1e2130;
+  }
+  [data-theme="dark"] select {
+    background: #161825;
+    color: var(--gray-900);
+  }
+  [data-theme="dark"] .radio-group label {
+    background: #161825;
+    color: var(--gray-700);
+  }
+  [data-theme="dark"] .radio-group label.active {
+    background: var(--orange);
+    color: white;
+  }
+  [data-theme="dark"] .btn-preview {
+    background: #161825;
+    color: var(--gray-700);
+  }
+  [data-theme="dark"] .btn-save {
+    background: var(--orange);
+    color: white;
+  }
+  [data-theme="dark"] .toggle .slider::before {
+    background: #e5e7eb;
+  }
+
+  /* Theme toggle */
+  .header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+  .theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    height: 32px;
+    padding: 0 0.625rem;
+    border: 1px solid var(--gray-200);
+    border-radius: 0.5rem;
+    background: transparent;
+    color: var(--gray-500);
+    font-size: 0.8125rem;
+    cursor: pointer;
+    transition: border-color 0.15s;
+    flex-shrink: 0;
+  }
+  .theme-toggle:hover { border-color: var(--orange); }
 </style>
 </head>
 <body>
 
-<h1>Claude Code Notifications</h1>
-<p class="subtitle">Configure notification sounds, volume, and alert styles.</p>
+<div class="header-row">
+  <div>
+    <h1>Claude Code Notifications</h1>
+    <p class="subtitle">Configure notification sounds, volume, and alert styles.</p>
+  </div>
+  <button class="theme-toggle" onclick="toggleTheme()" id="theme-btn" title="Toggle dark/light theme"></button>
+</div>
 
 <div id="app">Loading...</div>
 
 <script>
+// Theme management
+function getPreferredTheme() {
+  const saved = localStorage.getItem('theme');
+  if (saved) return saved;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  const btn = document.getElementById('theme-btn');
+  if (btn) btn.textContent = theme === 'dark' ? '\u2600 Light' : '\u263E Dark';
+}
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme');
+  const next = current === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('theme', next);
+  applyTheme(next);
+}
+applyTheme(getPreferredTheme());
+
 const SOUNDS = %%SOUNDS%%;
 const EVENT_META = %%EVENT_META%%;
 const EVENT_ORDER = %%EVENT_ORDER%%;
@@ -335,9 +402,10 @@ async function loadConfig() {
 function getEventVal(key, field) {
   const evt = (config.events || {})[key] || {};
   if (field === 'enabled') return evt.enabled !== undefined ? evt.enabled : true;
-  if (field === 'sound') return evt.sound || config.default_sound || 'Funk';
-  if (field === 'volume') return evt.volume !== undefined ? evt.volume : (config.default_volume !== undefined ? config.default_volume : 7);
-  if (field === 'style') return evt.style || config.default_style || 'persistent';
+  if (field === 'sound') return evt.sound || 'Funk';
+  if (field === 'volume') return evt.volume !== undefined ? evt.volume : 7;
+  if (field === 'style') return evt.style || 'persistent';
+  if (field === 'sound_enabled') return evt.sound_enabled !== undefined ? evt.sound_enabled : true;
   return undefined;
 }
 
@@ -351,47 +419,6 @@ function render() {
   const app = document.getElementById('app');
   let html = '';
 
-  // Defaults card
-  html += `<div class="card">
-    <div class="defaults-title">Defaults</div>
-    <div class="card-desc">Fallback values for events that don't specify their own settings.</div>
-    <div class="controls">
-      <div class="control-group">
-        <label>Sound</label>
-        <select id="def-sound" onchange="config.default_sound=this.value">
-          ${SOUNDS.map(s => `<option value="${s}" ${s===config.default_sound?'selected':''}>${s}</option>`).join('')}
-        </select>
-      </div>
-      <div class="control-group">
-        <label>Volume</label>
-        <div class="volume-row">
-          <input type="range" id="def-volume" min="1" max="20" value="${config.default_volume||7}"
-            oninput="config.default_volume=+this.value;this.nextElementSibling.textContent=this.value">
-          <span class="volume-val">${config.default_volume||7}</span>
-        </div>
-      </div>
-      <div class="control-group">
-        <label>Style</label>
-        <div class="radio-group" id="def-style-group">
-          <label class="${(config.default_style||'persistent')==='persistent'?'active':''}"
-            onclick="setRadio('def-style-group','persistent');config.default_style='persistent'">
-            <input type="radio" name="def-style" value="persistent" ${(config.default_style||'persistent')==='persistent'?'checked':''}><span>Persistent</span>
-          </label>
-          <label class="${(config.default_style||'persistent')==='banner'?'active':''}"
-            onclick="setRadio('def-style-group','banner');config.default_style='banner'">
-            <input type="radio" name="def-style" value="banner" ${(config.default_style||'persistent')==='banner'?'checked':''}><span>Banner</span>
-          </label>
-        </div>
-      </div>
-      <div class="control-group">
-        <label>&nbsp;</label>
-        <button class="btn-preview" onclick="preview(config.default_sound||'Funk',config.default_volume||7,config.default_style||'persistent')">&#9654; Preview</button>
-      </div>
-    </div>
-  </div>`;
-
-  html += '<hr class="divider">';
-
   // Event cards
   for (const key of EVENT_ORDER) {
     const meta = EVENT_META[key] || {label: key, description: ''};
@@ -399,6 +426,8 @@ function render() {
     const sound = getEventVal(key, 'sound');
     const volume = getEventVal(key, 'volume');
     const style = getEventVal(key, 'style');
+    const soundOn = getEventVal(key, 'sound_enabled');
+    const soundCtrlOff = !enabled || !soundOn;
 
     html += `<div class="card ${enabled?'':'disabled'}" id="card-${key}">
       <div class="card-header">
@@ -414,14 +443,14 @@ function render() {
       <div class="controls">
         <div class="control-group">
           <label>Sound</label>
-          <select id="sound-${key}" onchange="setEventVal('${key}','sound',this.value)" ${enabled?'':'disabled'}>
+          <select id="sound-${key}" onchange="setEventVal('${key}','sound',this.value)" ${soundCtrlOff?'disabled':''}>
             ${SOUNDS.map(s => `<option value="${s}" ${s===sound?'selected':''}>${s}</option>`).join('')}
           </select>
         </div>
         <div class="control-group">
           <label>Volume</label>
           <div class="volume-row">
-            <input type="range" id="vol-${key}" min="1" max="20" value="${volume}" ${enabled?'':'disabled'}
+            <input type="range" id="vol-${key}" min="1" max="20" value="${volume}" ${soundCtrlOff?'disabled':''}
               oninput="setEventVal('${key}','volume',+this.value);this.nextElementSibling.textContent=this.value">
             <span class="volume-val">${volume}</span>
           </div>
@@ -440,8 +469,15 @@ function render() {
           </div>
         </div>
         <div class="control-group">
+          <label>Sound Enabled</label>
+          <label class="toggle">
+            <input type="checkbox" ${soundOn?'checked':''} ${enabled?'':'disabled'} onchange="setEventVal('${key}','sound_enabled',this.checked);render()">
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="control-group">
           <label>&nbsp;</label>
-          <button class="btn-preview" onclick="preview(getEvtSound('${key}'),getEvtVol('${key}'),getEventVal('${key}','style'),'${key}')" ${enabled?'':'disabled'}>&#9654; Preview</button>
+          <button class="btn-preview" onclick="preview(getEvtSound('${key}'),getEvtVol('${key}'),getEventVal('${key}','style'),'${key}',${soundOn})" ${enabled?'':'disabled'}>&#9654; Preview</button>
         </div>
       </div>
     </div>`;
@@ -478,11 +514,12 @@ function toggleEvent(key, checked) {
 function getEvtSound(key) { return getEventVal(key, 'sound'); }
 function getEvtVol(key) { return getEventVal(key, 'volume'); }
 
-async function preview(sound, volume, style, eventKey) {
+async function preview(sound, volume, style, eventKey, soundEnabled) {
+  const se = soundEnabled !== undefined ? soundEnabled : true;
   await fetch('/api/preview', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({sound, volume, style, event_key: eventKey || null}),
+    body: JSON.stringify({sound, volume, style, event_key: eventKey || null, sound_enabled: se}),
   });
 }
 
@@ -536,17 +573,13 @@ TERMINAL_BUNDLE = _detect_terminal_bundle()
 
 PREVIEW_TITLES = {
     "permission_request": "Claude Code - Permission Required",
-    "permission_prompt": "Claude Code - Action Required",
-    "idle_prompt": "Claude Code - Action Required",
-    "elicitation_dialog": "Claude Code - Action Required",
+"elicitation_dialog": "Claude Code - Action Required",
     "stop": "Claude Code - Done",
 }
 
 PREVIEW_BODIES = {
     "permission_request": "Approve: Bash (preview)",
-    "permission_prompt": "Permission required (preview)",
-    "idle_prompt": "Waiting for your input (preview)",
-    "elicitation_dialog": "Claude has a question (preview)",
+"elicitation_dialog": "Claude has a question (preview)",
     "stop": "Finished responding (preview)",
 }
 
@@ -643,6 +676,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
             try:
                 body = self._read_body()
                 data = json.loads(body)
+                for k in list(data.keys()):
+                    if k.startswith("default_"):
+                        del data[k]
                 with open(CONFIG_PATH, "w") as f:
                     json.dump(data, f, indent=2)
                     f.write("\n")
@@ -683,17 +719,20 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 if style not in ("persistent", "banner"):
                     style = "persistent"
 
+                sound_enabled = data.get("sound_enabled", True)
+
                 # Send macOS notification via the appropriate notifier app
                 _send_preview_notification(style, event_key)
 
-                # Play alert sound
-                sound_path = f"/System/Library/Sounds/{sound}.aiff"
-                if os.path.exists(sound_path):
-                    subprocess.Popen(
-                        ["afplay", sound_path, "-v", str(volume)],
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
-                    )
+                # Play alert sound (if sound is enabled)
+                if sound_enabled:
+                    sound_path = f"/System/Library/Sounds/{sound}.aiff"
+                    if os.path.exists(sound_path):
+                        subprocess.Popen(
+                            ["afplay", sound_path, "-v", str(volume)],
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                        )
                 self._send_json({"ok": True})
             except json.JSONDecodeError:
                 self._send_error(400, "Invalid JSON")

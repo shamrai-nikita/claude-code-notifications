@@ -30,7 +30,6 @@ Restart any running Claude Code sessions.
 | Permission request | Claude needs you to approve an action | On | Persistent |
 | Question | Claude is asking you a question | On | Persistent |
 | Done | Claude finished responding | On | Banner |
-| Idle prompt | Claude is waiting (not blocked) | Off | — |
 
 ## Settings UI
 
@@ -56,8 +55,7 @@ Edit `~/.claude/notify-config.json` directly, or use the settings UI above. Chan
   "events": {
     "permission_request": { "enabled": true, "sound": "Funk", "volume": 7, "style": "persistent" },
     "elicitation_dialog": { "enabled": true, "sound": "Glass", "volume": 7, "style": "persistent" },
-    "stop":               { "enabled": true, "sound": "Hero", "volume": 7, "style": "banner" },
-    "idle_prompt":        { "enabled": false }
+    "stop":               { "enabled": true, "sound": "Hero", "volume": 7, "style": "banner" }
   }
 }
 ```

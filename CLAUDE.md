@@ -32,7 +32,7 @@ Claude Code hooks (defined in `~/.claude/settings.json`) trigger `notify.sh` on 
 | Hook Event | When it fires | Config key |
 |---|---|---|
 | `PermissionRequest` | A real permission dialog is shown (needs user action) | `permission_request` |
-| `Notification` | Claude sends a built-in notification (elicitation dialog, etc.) | `elicitation_dialog`, `permission_prompt`, `idle_prompt` |
+| `Notification` | Claude sends a built-in notification (elicitation dialog, etc.) | `elicitation_dialog` |
 | `Stop` | Claude finishes responding | `stop` |
 
 The script reads JSON from stdin (hook event data), loads `notify-config.json`, and:
@@ -40,7 +40,7 @@ The script reads JSON from stdin (hook event data), loads `notify-config.json`, 
 2. Checks if the event is `enabled` in config — exits if disabled
 3. Selects the correct notifier app based on the event's `style` setting (persistent or banner)
 4. Sends notification via the selected `ClaudeNotifier*.app`
-5. Plays sound via `afplay` at configured volume
+5. Plays sound via `afplay` at configured volume (skipped if `sound_enabled` is false)
 
 Clicking a notification activates the terminal and switches to the correct tab. The terminal is auto-detected from `$TERM_PROGRAM`:
 
@@ -53,8 +53,6 @@ Clicking a notification activates the terminal and switches to the correct tab. 
 
 ## Key design decisions
 
-- **`PermissionRequest` over `Notification.permission_prompt`**: The `Notification` hook's `permission_prompt` type fires even for auto-approved permissions (false positives). `PermissionRequest` only fires when a dialog is actually shown.
-- **`idle_prompt` disabled**: Fires when Claude is idle after responding — not when blocked. Too noisy. `Stop` event covers task completion.
 - **Two app bundles**: macOS locks notification style to the app bundle. To support per-event persistent vs banner, we build two variants of the notifier app with different bundle IDs and `NSUserNotificationAlertStyle` values.
 - **Legacy fallback**: If the selected variant app doesn't exist, `notify.sh` falls back to the legacy single `ClaudeNotifier.app` for backward compatibility.
 - **Custom app bundles**: macOS locks notification icon to the sending app. `-appIcon` flag doesn't work on modern macOS. Solution: copy `terminal-notifier.app`, change bundle ID/name/icon.
@@ -72,12 +70,11 @@ Clicking a notification activates the terminal and switches to the correct tab. 
   "default_sound": "Funk",
   "default_volume": 7,
   "default_style": "persistent",
+  "default_sound_enabled": true,
   "events": {
-    "permission_request": { "enabled": true, "sound": "Funk", "volume": 7, "style": "persistent" },
-    "permission_prompt":  { "enabled": false },
-    "idle_prompt":        { "enabled": false },
-    "elicitation_dialog": { "enabled": true, "sound": "Glass", "volume": 7, "style": "persistent" },
-    "stop":               { "enabled": true, "sound": "Hero", "volume": 7, "style": "banner" }
+    "permission_request": { "enabled": true, "sound": "Funk", "volume": 7, "style": "persistent", "sound_enabled": true },
+    "elicitation_dialog": { "enabled": true, "sound": "Glass", "volume": 7, "style": "persistent", "sound_enabled": true },
+    "stop":               { "enabled": true, "sound": "Hero", "volume": 7, "style": "banner", "sound_enabled": true }
   }
 }
 ```
@@ -86,8 +83,10 @@ Clicking a notification activates the terminal and switches to the correct tab. 
 - **`sound`**: macOS system sound name — Basso, Blow, Bottle, Frog, Funk, Glass, Hero, Morse, Ping, Pop, Purr, Sosumi, Submarine, Tink
 - **`volume`**: number passed to `afplay -v` (1=quiet, 7=normal, 10=loud, 20=very loud)
 - **`style`**: `"persistent"` (stays on screen) or `"banner"` (auto-dismisses)
-- Per-event settings fall back to `default_sound`/`default_volume`/`default_style`, then hardcoded defaults (Funk/10/persistent)
-- **Backward compat**: Missing `style` fields default to `default_style`, then `"persistent"`. Existing configs work unchanged.
+- **`sound_enabled`**: `true`/`false` — when false, notification is shown but no sound is played
+- **`default_sound_enabled`**: fallback for events that don't specify `sound_enabled` (defaults to `true` if missing)
+- Per-event settings fall back to `default_sound`/`default_volume`/`default_style`/`default_sound_enabled`, then hardcoded defaults (Funk/10/persistent/true)
+- **Backward compat**: Missing `style` or `sound_enabled` fields default to their respective `default_*` values. Existing configs work unchanged.
 
 ## Settings UI
 
@@ -101,7 +100,7 @@ open ~/.claude/Configure\ Notifications.command
 python3 ~/.claude/config-ui.py
 ```
 
-This opens a local web page where you can configure all notification settings: enable/disable events, choose sounds, adjust volume, set persistent vs banner style, and preview sounds. The server auto-shuts down when the browser tab is closed (heartbeat watchdog).
+This opens a local web page where you can configure all notification settings: enable/disable events, choose sounds, adjust volume, mute sound per event, set persistent vs banner style, switch between dark/light themes, and preview notifications. The server auto-shuts down when the browser tab is closed (heartbeat watchdog).
 
 ## Hooks config in settings.json
 
@@ -168,9 +167,6 @@ echo '{"hook_event_name":"PermissionRequest","tool_name":"Bash","tool_input":{"c
 
 # Test stop notification (banner style by default)
 echo '{"hook_event_name":"Stop","stop_hook_active":false}' | bash ~/.claude/notify.sh
-
-# Test disabled event (should produce nothing)
-echo '{"hook_event_name":"Notification","notification_type":"idle_prompt","message":"test"}' | bash ~/.claude/notify.sh
 
 # Test elicitation
 echo '{"hook_event_name":"Notification","notification_type":"elicitation_dialog","message":"Which approach?"}' | bash ~/.claude/notify.sh

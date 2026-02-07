@@ -13,7 +13,7 @@ CONFIG="$HOME/.claude/notify-config.json"
 INPUT=$(cat)
 
 # Parse hook event data and read config in a single python3 call
-# Outputs: EVENT_KEY ENABLED SOUND VOLUME STYLE TITLE BODY
+# Outputs: EVENT_KEY ENABLED SOUND VOLUME STYLE SOUND_ENABLED TITLE BODY
 eval $(CLAUDE_HOOK_INPUT="$INPUT" python3 -c "
 import sys, json, os
 
@@ -31,9 +31,6 @@ try:
 except:
     config = {}
 
-default_sound = config.get('default_sound', 'Funk')
-default_volume = config.get('default_volume', 10)
-default_style = config.get('default_style', 'persistent')
 events_config = config.get('events', {})
 
 # Determine event key and notification text
@@ -44,14 +41,10 @@ if event == 'PermissionRequest':
 elif event == 'Notification':
     event_key = notif_type if notif_type else 'notification'
     titles = {
-        'permission_prompt': 'Claude Code - Action Required',
-        'idle_prompt': 'Claude Code - Action Required',
         'elicitation_dialog': 'Claude Code - Action Required',
     }
     title = titles.get(notif_type, 'Claude Code - Action Required')
     bodies = {
-        'permission_prompt': f'Permission required: {message}' if message else 'Permission required',
-        'idle_prompt': f'Waiting for your input: {message}' if message else 'Waiting for your input',
         'elicitation_dialog': f'Claude has a question: {message}' if message else 'Claude has a question',
     }
     body = bodies.get(notif_type, message or 'Needs your attention')
@@ -66,10 +59,11 @@ else:
 
 # Get per-event config
 evt = events_config.get(event_key, {})
-enabled = evt.get('enabled', True)
-sound = evt.get('sound', default_sound)
-volume = evt.get('volume', default_volume)
-style = evt.get('style', default_style)
+enabled = evt.get('enabled', event_key in events_config)
+sound = evt.get('sound', 'Funk')
+volume = evt.get('volume', 7)
+style = evt.get('style', 'persistent')
+sound_enabled = evt.get('sound_enabled', True)
 
 # Escape single quotes for shell
 title = title.replace(\"'\", \"'\\\\''\")
@@ -80,6 +74,7 @@ print(f\"ENABLED={'1' if enabled else '0'}\")
 print(f\"SOUND='{sound}'\")
 print(f\"VOLUME={volume}\")
 print(f\"STYLE='{style}'\")
+print(f\"SOUND_ENABLED={'1' if sound_enabled else '0'}\")
 print(f\"TITLE='{title}'\")
 print(f\"BODY='{body}'\")
 " 2>/dev/null)
@@ -132,5 +127,7 @@ else
     2>/dev/null
 fi
 
-# Play alert sound at configured volume
-afplay "/System/Library/Sounds/${SOUND}.aiff" -v "$VOLUME" &
+# Play alert sound at configured volume (if sound is enabled)
+if [ "$SOUND_ENABLED" = "1" ]; then
+  afplay "/System/Library/Sounds/${SOUND}.aiff" -v "$VOLUME" &
+fi
