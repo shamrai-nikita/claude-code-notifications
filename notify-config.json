@@ -1,0 +1,31 @@
+{
+  "default_sound": "Funk",
+  "default_volume": 7,
+  "default_style": "persistent",
+  "events": {
+    "permission_request": {
+      "enabled": true,
+      "sound": "Funk",
+      "volume": 7,
+      "style": "persistent"
+    },
+    "permission_prompt": {
+      "enabled": false
+    },
+    "idle_prompt": {
+      "enabled": false
+    },
+    "elicitation_dialog": {
+      "enabled": true,
+      "sound": "Glass",
+      "volume": 7,
+      "style": "persistent"
+    },
+    "stop": {
+      "enabled": true,
+      "sound": "Hero",
+      "volume": 7,
+      "style": "banner"
+    }
+  }
+}

@@ -1,0 +1,184 @@
+# Claude Code Notifications — macOS
+
+Native macOS notification system for Claude Code. Shows notifications with Claude icon and configurable sounds when Claude needs attention or finishes a task. Supports per-event persistent or banner alert styles.
+
+## Architecture
+
+```
+~/.claude/
+├── notify.sh                       # Main script — hook handler
+├── notify-config.json              # User config (sounds, volume, style, enable/disable per event)
+├── config-ui.py                    # Browser-based settings UI (python3, zero deps, auto-shutdown)
+├── Configure Notifications.command # Double-click to open settings UI
+├── ClaudeNotifierPersistent.app/   # Persistent alert style (stays on screen)
+│   └── Contents/
+│       ├── Info.plist              # Bundle ID: com.anthropic.claude-code-notifier-persistent
+│       ├── MacOS/terminal-notifier
+│       └── Resources/Claude.icns
+├── ClaudeNotifierBanner.app/       # Banner alert style (auto-dismisses)
+│   └── Contents/
+│       ├── Info.plist              # Bundle ID: com.anthropic.claude-code-notifier-banner
+│       ├── MacOS/terminal-notifier
+│       └── Resources/Claude.icns
+├── claude-icon-large.png           # 180x180 Claude logo (from claude.ai/apple-touch-icon.png)
+└── Claude.icns                     # macOS icon set generated from the PNG
+```
+
+## How it works
+
+Claude Code hooks (defined in `~/.claude/settings.json`) trigger `notify.sh` on three events:
+
+| Hook Event | When it fires | Config key |
+|---|---|---|
+| `PermissionRequest` | A real permission dialog is shown (needs user action) | `permission_request` |
+| `Notification` | Claude sends a built-in notification (elicitation dialog, etc.) | `elicitation_dialog`, `permission_prompt`, `idle_prompt` |
+| `Stop` | Claude finishes responding | `stop` |
+
+The script reads JSON from stdin (hook event data), loads `notify-config.json`, and:
+1. Resolves event key, title, body text
+2. Checks if the event is `enabled` in config — exits if disabled
+3. Selects the correct notifier app based on the event's `style` setting (persistent or banner)
+4. Sends notification via the selected `ClaudeNotifier*.app`
+5. Plays sound via `afplay` at configured volume
+
+Clicking a notification opens Warp terminal (`dev.warp.Warp-Stable`).
+
+## Key design decisions
+
+- **`PermissionRequest` over `Notification.permission_prompt`**: The `Notification` hook's `permission_prompt` type fires even for auto-approved permissions (false positives). `PermissionRequest` only fires when a dialog is actually shown.
+- **`idle_prompt` disabled**: Fires when Claude is idle after responding — not when blocked. Too noisy. `Stop` event covers task completion.
+- **Two app bundles**: macOS locks notification style to the app bundle. To support per-event persistent vs banner, we build two variants of the notifier app with different bundle IDs and `NSUserNotificationAlertStyle` values.
+- **Legacy fallback**: If the selected variant app doesn't exist, `notify.sh` falls back to the legacy single `ClaudeNotifier.app` for backward compatibility.
+- **Custom app bundles**: macOS locks notification icon to the sending app. `-appIcon` flag doesn't work on modern macOS. Solution: copy `terminal-notifier.app`, change bundle ID/name/icon.
+- **Alert style**: Set via `NSUserNotificationAlertStyle` in Info.plist (`alert` for persistent, `banner` for banner). User must also configure in System Settings > Notifications.
+- **Single python3 call**: All JSON parsing (stdin + config file) in one python3 invocation for performance.
+- **Settings UI**: Self-contained Python 3 script (`config-ui.py`) serves a browser-based UI on localhost. Zero external dependencies.
+- **Heartbeat auto-shutdown**: The browser sends `POST /api/heartbeat` every 3s. A watchdog daemon thread waits 30s (grace period for browser to open), then exits if no heartbeat for 10s. This means closing the browser tab auto-stops the server.
+
+## Config: notify-config.json
+
+```json
+{
+  "default_sound": "Funk",
+  "default_volume": 7,
+  "default_style": "persistent",
+  "events": {
+    "permission_request": { "enabled": true, "sound": "Funk", "volume": 7, "style": "persistent" },
+    "permission_prompt":  { "enabled": false },
+    "idle_prompt":        { "enabled": false },
+    "elicitation_dialog": { "enabled": true, "sound": "Glass", "volume": 7, "style": "persistent" },
+    "stop":               { "enabled": true, "sound": "Hero", "volume": 7, "style": "banner" }
+  }
+}
+```
+
+- **`enabled`**: `true`/`false` — skip notification entirely when false
+- **`sound`**: macOS system sound name — Basso, Blow, Bottle, Frog, Funk, Glass, Hero, Morse, Ping, Pop, Purr, Sosumi, Submarine, Tink
+- **`volume`**: number passed to `afplay -v` (1=quiet, 7=normal, 10=loud, 20=very loud)
+- **`style`**: `"persistent"` (stays on screen) or `"banner"` (auto-dismisses)
+- Per-event settings fall back to `default_sound`/`default_volume`/`default_style`, then hardcoded defaults (Funk/10/persistent)
+- **Backward compat**: Missing `style` fields default to `default_style`, then `"persistent"`. Existing configs work unchanged.
+
+## Settings UI
+
+Launch the browser-based settings UI:
+
+```bash
+# Double-click in Finder:
+open ~/.claude/Configure\ Notifications.command
+
+# Or run directly:
+python3 ~/.claude/config-ui.py
+```
+
+This opens a local web page where you can configure all notification settings: enable/disable events, choose sounds, adjust volume, set persistent vs banner style, and preview sounds. The server auto-shuts down when the browser tab is closed (heartbeat watchdog).
+
+## Hooks config in settings.json
+
+Only the `hooks` section is relevant (the rest is user-specific):
+
+```json
+{
+  "hooks": {
+    "Notification": [
+      { "matcher": "", "hooks": [{ "type": "command", "command": "bash ~/.claude/notify.sh" }] }
+    ],
+    "PermissionRequest": [
+      { "matcher": "", "hooks": [{ "type": "command", "command": "bash ~/.claude/notify.sh" }] }
+    ],
+    "Stop": [
+      { "matcher": "", "hooks": [{ "type": "command", "command": "bash ~/.claude/notify.sh" }] }
+    ]
+  }
+}
+```
+
+## Installation (fresh machine)
+
+```bash
+./install.sh
+```
+
+This single command handles everything:
+1. Installs `terminal-notifier` via Homebrew (if missing)
+2. Downloads Claude icon and converts to `.icns`
+3. Builds two `ClaudeNotifier*.app` bundles (Persistent + Banner) with Claude branding
+4. Removes legacy `ClaudeNotifier.app` if present
+5. Sends test notifications to trigger macOS permission prompts
+6. Copies `notify.sh`, `notify-config.json`, and `config-ui.py` to `~/.claude/`
+7. Installs `Configure Notifications.command` launcher to `~/.claude/`
+8. Automatically merges hooks into `~/.claude/settings.json` (creates if missing, preserves existing settings)
+
+**Manual steps after install:**
+1. System Settings > Notifications > **ClaudeNotifications (Persistent)** > set Alert Style to **Alerts**
+2. System Settings > Notifications > **ClaudeNotifications (Vanishing)** > leave as **Banners**
+
+Then restart Claude Code sessions (or run `/hooks` to reload).
+
+## Uninstall
+
+```bash
+./uninstall.sh
+```
+
+Removes all notification components:
+1. Removes notification hooks from `~/.claude/settings.json` (preserves all other settings)
+2. Clears delivered notifications
+3. Unregisters app bundles from LaunchServices
+4. Deletes all installed files (notify.sh, config, UI, icon, apps, launcher)
+5. Removes entries from Notification Center database (`com.anthropic.claude-code-notifier*`) and restarts `usernoted` so they disappear from System Settings > Notifications
+
+Does NOT remove `terminal-notifier` Homebrew package or `~/.claude/` directory. Idempotent — safe to run multiple times.
+
+## Testing
+
+```bash
+# Test permission notification (persistent style)
+echo '{"hook_event_name":"PermissionRequest","tool_name":"Bash","tool_input":{"command":"rm -rf /"}}' | bash ~/.claude/notify.sh
+
+# Test stop notification (banner style by default)
+echo '{"hook_event_name":"Stop","stop_hook_active":false}' | bash ~/.claude/notify.sh
+
+# Test disabled event (should produce nothing)
+echo '{"hook_event_name":"Notification","notification_type":"idle_prompt","message":"test"}' | bash ~/.claude/notify.sh
+
+# Test elicitation
+echo '{"hook_event_name":"Notification","notification_type":"elicitation_dialog","message":"Which approach?"}' | bash ~/.claude/notify.sh
+
+# Launch settings UI
+python3 ~/.claude/config-ui.py
+```
+
+## Files in this project
+
+| File | Purpose |
+|---|---|
+| `CLAUDE.md` | This file — project context |
+| `notify.sh` | Main notification script (hook handler) |
+| `notify-config.json` | User-editable config |
+| `config-ui.py` | Browser-based settings UI (with heartbeat auto-shutdown) |
+| `Configure Notifications.command` | Double-clickable launcher for config-ui.py |
+| `install.sh` | Setup script — builds notifier apps, downloads icon, installs to ~/.claude/ |
+| `uninstall.sh` | Removes all notification components from ~/.claude/ |
+| `ClaudeNotifierPersistent.plist` | Info.plist template for the persistent alert app |
+| `ClaudeNotifierBanner.plist` | Info.plist template for the banner alert app |

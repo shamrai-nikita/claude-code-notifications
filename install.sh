@@ -1,0 +1,168 @@
+#!/bin/bash
+# Claude Code Notifications — macOS installer
+# Installs notification system to ~/.claude/
+set -e
+
+CLAUDE_DIR="$HOME/.claude"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister"
+
+echo "=== Claude Code Notifications Installer ==="
+
+# 1. Check/install terminal-notifier
+if ! command -v terminal-notifier &>/dev/null; then
+  echo "Installing terminal-notifier via Homebrew..."
+  brew install terminal-notifier
+else
+  echo "terminal-notifier already installed."
+fi
+
+TN_APP=$(find /usr/local/Cellar/terminal-notifier -name "terminal-notifier.app" -maxdepth 2 2>/dev/null | head -1)
+if [ -z "$TN_APP" ]; then
+  TN_APP=$(find /opt/homebrew/Cellar/terminal-notifier -name "terminal-notifier.app" -maxdepth 2 2>/dev/null | head -1)
+fi
+if [ -z "$TN_APP" ]; then
+  echo "ERROR: Could not find terminal-notifier.app in Homebrew cellar."
+  exit 1
+fi
+echo "Found terminal-notifier at: $TN_APP"
+
+# 2. Download Claude icon
+echo "Downloading Claude icon..."
+curl -sL "https://claude.ai/apple-touch-icon.png" -o "$CLAUDE_DIR/claude-icon-large.png"
+if ! file "$CLAUDE_DIR/claude-icon-large.png" | grep -q "PNG"; then
+  echo "WARNING: Could not download Claude icon. Notifications will use default icon."
+fi
+
+# 3. Convert PNG to icns
+echo "Converting icon to icns..."
+ICONSET="$CLAUDE_DIR/claude.iconset"
+mkdir -p "$ICONSET"
+SRC="$CLAUDE_DIR/claude-icon-large.png"
+sips -z 16 16 "$SRC" --out "$ICONSET/icon_16x16.png" > /dev/null
+sips -z 32 32 "$SRC" --out "$ICONSET/icon_16x16@2x.png" > /dev/null
+sips -z 32 32 "$SRC" --out "$ICONSET/icon_32x32.png" > /dev/null
+sips -z 64 64 "$SRC" --out "$ICONSET/icon_32x32@2x.png" > /dev/null
+sips -z 128 128 "$SRC" --out "$ICONSET/icon_128x128.png" > /dev/null
+sips -z 180 180 "$SRC" --out "$ICONSET/icon_128x128@2x.png" > /dev/null
+iconutil -c icns "$ICONSET" -o "$CLAUDE_DIR/Claude.icns"
+rm -rf "$ICONSET"
+echo "Icon created."
+
+# 4. Build ClaudeNotifier app bundles (Persistent + Banner)
+echo "Building ClaudeNotifier app bundles..."
+
+# Remove legacy single-variant app if present
+if [ -d "$CLAUDE_DIR/ClaudeNotifier.app" ]; then
+  echo "Removing legacy ClaudeNotifier.app..."
+  rm -rf "$CLAUDE_DIR/ClaudeNotifier.app"
+fi
+
+for variant in Persistent Banner; do
+  APP_NAME="ClaudeNotifier${variant}.app"
+  echo "  Building $APP_NAME..."
+  rm -rf "$CLAUDE_DIR/$APP_NAME"
+  cp -R "$TN_APP" "$CLAUDE_DIR/$APP_NAME"
+  cp "$SCRIPT_DIR/ClaudeNotifier${variant}.plist" "$CLAUDE_DIR/$APP_NAME/Contents/Info.plist"
+  cp "$CLAUDE_DIR/Claude.icns" "$CLAUDE_DIR/$APP_NAME/Contents/Resources/Claude.icns"
+  touch "$CLAUDE_DIR/$APP_NAME"
+  $LSREGISTER -f "$CLAUDE_DIR/$APP_NAME"
+  echo "  $APP_NAME installed and registered."
+done
+
+# 5. Send test notifications to trigger macOS permission prompts
+echo "Triggering notification permissions (you may see test notifications)..."
+for variant in Persistent Banner; do
+  NOTIFIER="$CLAUDE_DIR/ClaudeNotifier${variant}.app/Contents/MacOS/terminal-notifier"
+  "$NOTIFIER" -title "Claude Code Setup" -message "Notifications enabled" -group "claude-setup-${variant}" 2>/dev/null || true
+done
+# Brief pause then remove the test notifications
+sleep 1
+for variant in Persistent Banner; do
+  NOTIFIER="$CLAUDE_DIR/ClaudeNotifier${variant}.app/Contents/MacOS/terminal-notifier"
+  "$NOTIFIER" -remove "claude-setup-${variant}" 2>/dev/null || true
+done
+
+# 6. Copy notify.sh and config
+echo "Installing notify.sh and config..."
+cp "$SCRIPT_DIR/notify.sh" "$CLAUDE_DIR/notify.sh"
+chmod +x "$CLAUDE_DIR/notify.sh"
+
+if [ ! -f "$CLAUDE_DIR/notify-config.json" ]; then
+  cp "$SCRIPT_DIR/notify-config.json" "$CLAUDE_DIR/notify-config.json"
+  echo "Config installed (fresh)."
+else
+  echo "Config already exists — skipping (edit ~/.claude/notify-config.json manually)."
+fi
+
+# 7. Install config UI
+echo "Installing config-ui.py..."
+cp "$SCRIPT_DIR/config-ui.py" "$CLAUDE_DIR/config-ui.py"
+
+# 8. Install clickable launcher
+echo "Installing Configure Notifications.command..."
+cat > "$CLAUDE_DIR/Configure Notifications.command" << 'LAUNCHER'
+#!/bin/bash
+echo "Starting Claude Code Notifications settings..."
+echo ""
+python3 ~/.claude/config-ui.py
+echo ""
+echo "Server stopped. You can close this window."
+LAUNCHER
+chmod +x "$CLAUDE_DIR/Configure Notifications.command"
+
+# 9. Add hooks to settings.json
+echo "Configuring hooks in settings.json..."
+python3 -c "
+import json, os
+
+settings_path = os.path.expanduser('$CLAUDE_DIR/settings.json')
+
+# Load existing settings or start fresh
+if os.path.exists(settings_path):
+    with open(settings_path) as f:
+        settings = json.load(f)
+else:
+    settings = {}
+
+# Define the notification hooks
+hook_entry = lambda: [{'matcher': '', 'hooks': [{'type': 'command', 'command': 'bash ~/.claude/notify.sh'}]}]
+
+# Merge hooks — add missing ones, preserve existing
+hooks = settings.get('hooks', {})
+added = []
+for event in ['Notification', 'PermissionRequest', 'Stop']:
+    if event not in hooks:
+        hooks[event] = hook_entry()
+        added.append(event)
+
+settings['hooks'] = hooks
+
+# Write back with formatting preserved
+with open(settings_path, 'w') as f:
+    json.dump(settings, f, indent=2)
+    f.write('\n')
+
+if added:
+    print(f'Added hooks: {\", \".join(added)}')
+else:
+    print('All hooks already configured.')
+"
+
+echo ""
+echo "=== Installation complete ==="
+echo ""
+echo "MANUAL STEPS:"
+echo "  1. System Settings > Notifications > ClaudeNotifications (Persistent) > set Alert Style to 'Alerts'"
+echo "  2. System Settings > Notifications > ClaudeNotifications (Vanishing) > leave as 'Banners'"
+echo ""
+echo "Configure settings:"
+echo "  Double-click: ~/.claude/Configure Notifications.command"
+echo "  Or run:       python3 ~/.claude/config-ui.py"
+echo ""
+echo "Uninstall:"
+echo "  ./uninstall.sh"
+echo ""
+echo "Test with:"
+echo "  echo '{\"hook_event_name\":\"Stop\"}' | bash ~/.claude/notify.sh"
+echo "  echo '{\"hook_event_name\":\"PermissionRequest\",\"tool_name\":\"Bash\"}' | bash ~/.claude/notify.sh"
