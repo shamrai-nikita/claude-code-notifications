@@ -83,6 +83,61 @@ for variant in Persistent Banner; do
   "$NOTIFIER" -remove "claude-setup-${variant}" 2>/dev/null || true
 done
 
+# 5b. Configure notification alert styles in system preferences
+# macOS ignores NSUserNotificationAlertStyle for unsigned apps, so we set it
+# directly in com.apple.ncprefs.plist (the Notification Center prefs store).
+echo "Configuring notification alert styles..."
+sleep 1  # allow ncprefs to register the new apps
+python3 -c "
+import subprocess, plistlib, sys
+
+result = subprocess.run(['defaults', 'export', 'com.apple.ncprefs', '-'], capture_output=True)
+if result.returncode != 0:
+    print('  WARNING: Could not read notification preferences. Set alert styles manually.')
+    sys.exit(0)
+
+pl = plistlib.loads(result.stdout)
+apps = pl.get('apps', [])
+
+BANNERS = 1 << 3       # 8
+ALERTS  = 1 << 4       # 16
+SHOW_NC = 1 << 0       # 1
+BADGE   = 1 << 1       # 2
+SOUND   = 1 << 2       # 4
+ALLOW   = 1 << 25      # 33554432
+
+targets = {
+    'com.anthropic.claude-code-notifier-persistent': ALERTS,
+    'com.anthropic.claude-code-notifier-banner': BANNERS,
+}
+configured = []
+
+for app in apps:
+    bid = app.get('bundle-id', '')
+    if bid in targets:
+        flags = app.get('flags', 0)
+        # Clear both style bits, then set the desired one
+        flags &= ~(BANNERS | ALERTS)
+        flags |= targets[bid]
+        flags |= ALLOW | SHOW_NC | BADGE | SOUND
+        app['flags'] = flags
+        configured.append(bid.split('-')[-1])  # 'persistent' or 'banner'
+
+if configured:
+    data = plistlib.dumps(pl, fmt=plistlib.FMT_BINARY)
+    wr = subprocess.run(['defaults', 'import', 'com.apple.ncprefs', '-'], input=data)
+    if wr.returncode == 0:
+        subprocess.run(['killall', 'usernoted'], capture_output=True)
+        subprocess.run(['killall', 'NotificationCenter'], capture_output=True)
+        print('  Alert styles configured: ' + ', '.join(configured))
+    else:
+        print('  WARNING: Could not write notification preferences. Set alert styles manually.')
+else:
+    print('  WARNING: Apps not yet registered in Notification Center. Set alert styles manually:')
+    print('    System Settings > Notifications > ClaudeNotifications (Persistent) > Alerts')
+    print('    System Settings > Notifications > ClaudeNotifications (Vanishing) > Banners')
+" || echo "  WARNING: Could not configure alert styles. Set manually in System Settings > Notifications."
+
 # 6. Copy notify.sh and config
 echo "Installing notify.sh and config..."
 cp "$SCRIPT_DIR/notify.sh" "$CLAUDE_DIR/notify.sh"
@@ -152,7 +207,7 @@ else:
 echo ""
 echo "=== Installation complete ==="
 echo ""
-echo "MANUAL STEPS:"
+echo "IF ALERT STYLES WERE NOT AUTO-CONFIGURED (see warnings above):"
 echo "  1. System Settings > Notifications > ClaudeNotifications (Persistent) > set Alert Style to 'Alerts'"
 echo "  2. System Settings > Notifications > ClaudeNotifications (Vanishing) > leave as 'Banners'"
 echo ""

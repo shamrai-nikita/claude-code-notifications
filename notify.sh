@@ -15,10 +15,10 @@ INPUT=$(cat)
 
 # Parse hook event data and read config in a single python3 call
 # Outputs: EVENT_KEY ENABLED SOUND VOLUME STYLE TITLE BODY
-eval $(python3 -c "
+eval $(CLAUDE_HOOK_INPUT="$INPUT" python3 -c "
 import sys, json, os
 
-hook = json.loads('''$INPUT''') if '''$INPUT'''.strip() else {}
+raw = os.environ.get('CLAUDE_HOOK_INPUT', ''); hook = json.loads(raw) if raw.strip() else {}
 event = hook.get('hook_event_name', '')
 message = hook.get('message', '')
 notif_type = hook.get('notification_type', '')

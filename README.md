@@ -17,7 +17,7 @@ Never miss when Claude Code needs your attention. Get native macOS notifications
 ./install.sh
 ```
 
-Then:
+Alert styles (persistent vs banner) are configured automatically. If you see warnings during install, set manually:
 1. **System Settings > Notifications > ClaudeNotifications (Persistent)** — set Alert Style to **Alerts**
 2. **System Settings > Notifications > ClaudeNotifications (Vanishing)** — leave as **Banners**
 

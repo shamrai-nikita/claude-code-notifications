@@ -129,7 +129,7 @@ This single command handles everything:
 7. Installs `Configure Notifications.command` launcher to `~/.claude/`
 8. Automatically merges hooks into `~/.claude/settings.json` (creates if missing, preserves existing settings)
 
-**Manual steps after install:**
+The installer auto-configures alert styles (persistent vs banner) by writing to `com.apple.ncprefs.plist`. If auto-configuration fails (warnings shown during install), set manually:
 1. System Settings > Notifications > **ClaudeNotifications (Persistent)** > set Alert Style to **Alerts**
 2. System Settings > Notifications > **ClaudeNotifications (Vanishing)** > leave as **Banners**
 
