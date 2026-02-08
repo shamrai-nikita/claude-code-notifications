@@ -88,22 +88,22 @@ HTML_PAGE = r"""<!DOCTYPE html>
     --color-seg-active-text: #ffffff;
   }
   [data-theme="dark"] {
-    --color-bg: #0f0f12;
-    --color-surface: #1a1a1f;
+    --color-bg: #0f1117;
+    --color-surface: #1e2130;
     --color-accent: #e88565;
     --color-accent-hover: #d4764a;
     --color-accent-subtle: rgba(232,133,101,0.1);
     --color-text: #e7e5e4;
     --color-text-secondary: #a8a29e;
     --color-text-tertiary: #78716c;
-    --color-border: #2a2a30;
-    --color-border-strong: #3a3a42;
-    --color-input-bg: #141418;
-    --color-toggle-off: #3a3a42;
+    --color-border: #2d3348;
+    --color-border-strong: #3d4460;
+    --color-input-bg: #161825;
+    --color-toggle-off: #3d4460;
     --color-toggle-knob: #e7e5e4;
     --color-green: #34d399;
     --color-red: #f87171;
-    --color-seg-bg: #141418;
+    --color-seg-bg: #161825;
     --color-seg-active-bg: var(--color-accent);
     --color-seg-active-text: #ffffff;
   }
@@ -367,10 +367,60 @@ HTML_PAGE = r"""<!DOCTYPE html>
     transition: opacity 0.15s ease;
   }
   .sound-toggle-group .speaker-icon {
-    font-size: 0.875rem;
+    width: 14px;
+    height: 14px;
+    display: flex;
+    align-items: center;
     color: var(--color-text-secondary);
-    line-height: 1;
   }
+  .speaker-icon svg { width: 14px; height: 14px; }
+
+  /* Style info wrap + tooltip */
+  .style-info-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+  .info-icon {
+    width: 16px; height: 16px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.625rem;
+    font-weight: 600;
+    font-style: normal;
+    color: var(--color-text-tertiary);
+    cursor: help;
+    position: relative;
+    flex-shrink: 0;
+    line-height: 1;
+    transition: color 0.15s ease, border-color 0.15s ease;
+  }
+  .info-icon:hover { color: var(--color-accent); border-color: var(--color-accent); }
+  .info-tooltip {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%) translateY(-2px);
+    opacity: 0;
+    pointer-events: none;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 0.5rem;
+    padding: 0.625rem 0.75rem;
+    font-size: 0.75rem;
+    font-style: normal;
+    font-weight: 400;
+    line-height: 1.5;
+    color: var(--color-text-secondary);
+    width: 260px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    z-index: 50;
+  }
+  .info-icon:hover .info-tooltip { opacity: 1; pointer-events: auto; transform: translateX(-50%) translateY(2px); }
   .sound-controls-dim { opacity: 0.35; }
 
   /* Preview button */
@@ -464,7 +514,8 @@ HTML_PAGE = r"""<!DOCTYPE html>
     .controls-row > * { width: 100%; }
     select { width: 100%; }
     .volume-group { max-width: none; }
-    .seg-control { width: 100%; }
+    .style-info-wrap { width: 100%; }
+    .seg-control { flex: 1; }
     .seg-control label { flex: 1; }
     .controls-row-secondary { flex-direction: column; align-items: stretch; gap: 0.5rem; }
     .save-area { justify-content: stretch; }
@@ -597,20 +648,23 @@ function render() {
               oninput="setEventVal('${key}','volume',+this.value);this.nextElementSibling.textContent=this.value">
             <span class="volume-val">${volume}</span>
           </div>
-          <div class="seg-control" id="style-${key}">
-            <label class="${style==='persistent'?'active':''}"
-              onclick="if(!this.closest('.event-section').classList.contains('disabled')){setRadio('style-${key}','persistent');setEventVal('${key}','style','persistent')}">
-              <input type="radio" name="style-${key}" value="persistent" ${style==='persistent'?'checked':''} ${enabled?'':'disabled'}><span>Persistent</span>
-            </label>
-            <label class="${style==='banner'?'active':''}"
-              onclick="if(!this.closest('.event-section').classList.contains('disabled')){setRadio('style-${key}','banner');setEventVal('${key}','style','banner')}">
-              <input type="radio" name="style-${key}" value="banner" ${style==='banner'?'checked':''} ${enabled?'':'disabled'}><span>Banner</span>
-            </label>
+          <div class="style-info-wrap">
+            <div class="seg-control" id="style-${key}">
+              <label class="${style==='persistent'?'active':''}"
+                onclick="if(!this.closest('.event-section').classList.contains('disabled')){setRadio('style-${key}','persistent');setEventVal('${key}','style','persistent')}">
+                <input type="radio" name="style-${key}" value="persistent" ${style==='persistent'?'checked':''} ${enabled?'':'disabled'}><span>Persistent</span>
+              </label>
+              <label class="${style==='banner'?'active':''}"
+                onclick="if(!this.closest('.event-section').classList.contains('disabled')){setRadio('style-${key}','banner');setEventVal('${key}','style','banner')}">
+                <input type="radio" name="style-${key}" value="banner" ${style==='banner'?'checked':''} ${enabled?'':'disabled'}><span>Temporary</span>
+              </label>
+            </div>
+            <span class="info-icon">i<span class="info-tooltip"><strong>Persistent</strong> notification stays until you manually close it.<br><strong>Temporary</strong> notification vanishes on its own in 4 seconds.</span></span>
           </div>
         </div>
         <div class="controls-row-secondary">
           <div class="sound-toggle-group">
-            <span class="speaker-icon">${soundOn ? '\uD83D\uDD0A' : '\uD83D\uDD07'}</span>
+            <span class="speaker-icon">${soundOn ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>' : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>'}</span>
             <label class="toggle">
               <input type="checkbox" ${soundOn?'checked':''} ${enabled?'':'disabled'} onchange="setEventVal('${key}','sound_enabled',this.checked);render()">
               <span class="slider"></span>
