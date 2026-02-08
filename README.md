@@ -1,15 +1,13 @@
 # Claude Code Notifications for macOS
 
-Never miss when Claude Code needs your attention. Get native macOS notifications with the Claude icon and sound alerts when Claude asks for permission, has a question, or finishes a task.
+Native macOS notifications when Claude Code needs your attention or finishes a task. Configurable sounds and a browser-based settings UI.
 
 ## What you get
 
-- **Persistent or banner notifications** — choose per event type
-- **Custom notification icon** (bell with sparkle)
-- **Clicking the notification** opens your terminal (Warp)
-- **Configurable sounds and volume** per event type
-- **Browser-based settings UI** — no JSON editing required
-- **Works globally** across all projects and sessions
+- **Persistent or temporary notifications** — choose per event type
+- **Configurable sounds and volume** per event type, with per-event mute
+- **Auto-dismiss** — persistent notifications clear automatically when you take action
+- **Browser-based settings UI**
 
 ## Install
 
@@ -17,54 +15,24 @@ Never miss when Claude Code needs your attention. Get native macOS notifications
 ./install.sh
 ```
 
-Alert styles (persistent vs banner) are configured automatically. If you see warnings during install, set manually:
-1. **System Settings > Notifications > ClaudeNotifications (Persistent)** — set Alert Style to **Alerts**
-2. **System Settings > Notifications > ClaudeNotifications (Vanishing)** — leave as **Banners**
-
 Restart any running Claude Code sessions.
 
-## When you'll be notified
+## Events
 
-| Event | Description | Default | Style |
-|---|---|---|---|
-| Permission request | Claude needs you to approve an action | On | Persistent |
-| Question | Claude is asking you a question | On | Persistent |
-| Done | Claude finished responding | On | Banner |
+| Event | Description | Default style |
+|---|---|---|
+| Permission request | Claude needs you to approve an action | Persistent |
+| Question | Claude is asking you something | Persistent |
+| Done | Claude finished responding | Temporary |
 
-## Settings UI
+## Settings
 
 ```bash
-# Double-click in Finder / search in Spotlight / Launchpad:
 open /Applications/ClaudeNotifications.app
-
-# Or run directly:
-python3 ~/.claude/config-ui.py
+# or: python3 ~/.claude/config-ui.py
 ```
 
-Opens a browser-based settings page where you can toggle events, pick sounds, adjust volume, choose persistent vs banner style, and preview sounds. The server automatically shuts down when you close the browser tab.
-
-## Configuration
-
-Edit `~/.claude/notify-config.json` directly, or use the settings UI above. Changes apply immediately.
-
-```json
-{
-  "default_sound": "Funk",
-  "default_volume": 7,
-  "default_style": "persistent",
-  "events": {
-    "permission_request": { "enabled": true, "sound": "Funk", "volume": 7, "style": "persistent" },
-    "elicitation_dialog": { "enabled": true, "sound": "Glass", "volume": 7, "style": "persistent" },
-    "stop":               { "enabled": true, "sound": "Hero", "volume": 7, "style": "banner" }
-  }
-}
-```
-
-**Sound options:** Basso, Blow, Bottle, Frog, Funk, Glass, Hero, Morse, Ping, Pop, Purr, Sosumi, Submarine, Tink
-
-**Volume:** 1 = quiet, 7 = normal, 10 = loud
-
-**Style:** `"persistent"` (stays on screen until dismissed) or `"banner"` (auto-dismisses after a few seconds)
+Toggle events, pick sounds, adjust volume, choose persistent vs temporary, and preview — all from the browser.
 
 ## Uninstall
 
@@ -72,7 +40,7 @@ Edit `~/.claude/notify-config.json` directly, or use the settings UI above. Chan
 ./uninstall.sh
 ```
 
-Removes all notification hooks, app bundles, installed files from `~/.claude/`, and the launcher from `/Applications/`. Does not remove the `terminal-notifier` Homebrew package.
+Or drag `/Applications/ClaudeNotifications.app` to Trash — cleanup happens automatically on the next Claude Code hook event.
 
 ## Requirements
 
