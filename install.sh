@@ -173,6 +173,7 @@ cp "$CLAUDE_DIR/Claude.icns" "$LAUNCHER_APP/Contents/Resources/applet.icns"
 rm -f "$LAUNCHER_APP/Contents/Resources/Assets.car"
 $LSREGISTER -f "$LAUNCHER_APP"
 touch "$LAUNCHER_APP"
+touch "$CLAUDE_DIR/.notify-installed"
 
 # 8b. Flush icon caches so macOS picks up new icons
 echo "Flushing icon cache..."

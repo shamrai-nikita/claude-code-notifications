@@ -14,6 +14,7 @@ FILES_TO_REMOVE=(
   "$CLAUDE_DIR/Claude.icns"
   "$CLAUDE_DIR/claude-icon-large.png"
   "$CLAUDE_DIR/Configure Notifications.command"
+  "$CLAUDE_DIR/.notify-installed"
 )
 DIRS_TO_REMOVE=(
   "$CLAUDE_DIR/ClaudeNotifierPersistent.app"
@@ -21,6 +22,7 @@ DIRS_TO_REMOVE=(
   "$CLAUDE_DIR/ClaudeNotifier.app"
   "$CLAUDE_DIR/ClaudeNotifications.app"
   "/Applications/ClaudeNotifications.app"
+  "$CLAUDE_DIR/.notify-uninstall.lock"
 )
 
 echo "=== Claude Code Notifications Uninstaller ==="

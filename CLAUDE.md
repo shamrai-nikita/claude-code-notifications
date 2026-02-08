@@ -21,7 +21,8 @@ Native macOS notification system for Claude Code. Shows notifications with a cus
 │       ├── MacOS/terminal-notifier
 │       └── Resources/Claude.icns
 ├── claude-icon-large.png           # Custom bell-with-sparkle icon (copied from repo icon.png)
-└── Claude.icns                     # macOS icon set generated from the PNG
+├── Claude.icns                     # macOS icon set generated from the PNG
+└── .notify-installed               # Marker file — enables trash-based uninstall detection
 
 /Applications/
 └── ClaudeNotifications.app/        # Settings launcher (built by install.sh via osacompile)
@@ -149,18 +150,30 @@ Then restart Claude Code sessions (or run `/hooks` to reload).
 
 ## Uninstall
 
+Two ways to uninstall:
+
+### Option 1: Drag to Trash (standard macOS way)
+
+Drag `/Applications/ClaudeNotifications.app` to the Trash. The next time Claude Code fires a hook event, `notify.sh` detects the missing launcher and automatically cleans up all artifacts (hooks, scripts, config, app bundles, Notification Center entries). This is a full uninstall — identical to running the uninstall script.
+
+**How it works:** The installer creates a `.notify-installed` marker file in `~/.claude/`. On every hook invocation, `notify.sh` checks if the launcher app still exists. If the app is gone and the marker is present, it runs a self-cleanup function and exits.
+
+### Option 2: Uninstall script
+
 ```bash
 ./uninstall.sh
 ```
 
-Removes all notification components:
+Interactive uninstall with confirmation prompt.
+
+Both methods remove all notification components:
 1. Removes notification hooks from `~/.claude/settings.json` (preserves all other settings)
 2. Clears delivered notifications
 3. Unregisters app bundles from LaunchServices
 4. Deletes all installed files (notify.sh, notify-click.sh, config, UI, icon, apps) and launcher from `/Applications/`
 5. Removes entries from Notification Center database (`com.anthropic.claude-code-notifier*`) and restarts `usernoted` so they disappear from System Settings > Notifications
 
-Does NOT remove `terminal-notifier` Homebrew package or `~/.claude/` directory. Idempotent — safe to run multiple times.
+Neither method removes `terminal-notifier` Homebrew package or `~/.claude/` directory. Both are idempotent — safe to run multiple times.
 
 ## Testing
 

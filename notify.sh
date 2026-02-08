@@ -10,7 +10,112 @@ NOTIFIER_BANNER="$HOME/.claude/ClaudeNotifierBanner.app/Contents/MacOS/terminal-
 NOTIFIER_LEGACY="$HOME/.claude/ClaudeNotifier.app/Contents/MacOS/terminal-notifier"
 CONFIG="$HOME/.claude/notify-config.json"
 
+# --- Trash-based uninstall cleanup ---
+# If ClaudeNotifications.app was dragged to Trash, perform full cleanup and exit.
+# Uses a directory-based lock (mkdir is atomic) to prevent concurrent cleanup
+# from multiple hook events firing simultaneously.
+_claude_notify_cleanup() {
+  local CLAUDE_DIR="$HOME/.claude"
+  local SETTINGS="$CLAUDE_DIR/settings.json"
+  local LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister"
+
+  # Acquire lock — another cleanup may already be running
+  local LOCKFILE="$CLAUDE_DIR/.notify-uninstall.lock"
+  if ! mkdir "$LOCKFILE" 2>/dev/null; then
+    return 0
+  fi
+  trap 'rmdir "$LOCKFILE" 2>/dev/null' EXIT
+
+  # 1. Remove notification hooks from settings.json
+  if [ -f "$SETTINGS" ]; then
+    python3 -c "
+import json, os
+path = '$SETTINGS'
+with open(path) as f:
+    settings = json.load(f)
+hooks = settings.get('hooks', {})
+changed = False
+for event in ['Notification', 'PermissionRequest', 'Stop']:
+    if event in hooks:
+        filtered = [
+            entry for entry in hooks[event]
+            if not any(
+                'notify.sh' in h.get('command', '')
+                for h in entry.get('hooks', [])
+            )
+        ]
+        if len(filtered) != len(hooks[event]):
+            changed = True
+        if filtered:
+            hooks[event] = filtered
+        else:
+            del hooks[event]
+if not hooks and 'hooks' in settings:
+    del settings['hooks']
+else:
+    settings['hooks'] = hooks
+if changed:
+    with open(path, 'w') as f:
+        json.dump(settings, f, indent=2)
+        f.write('\n')
+" 2>/dev/null || true
+  fi
+
+  # 2. Clear delivered notifications
+  for group in claude-code-persistent claude-code-banner claude-code; do
+    for variant in Persistent Banner ""; do
+      local notifier="$CLAUDE_DIR/ClaudeNotifier${variant}.app/Contents/MacOS/terminal-notifier"
+      if [ -x "$notifier" ]; then
+        "$notifier" -remove "$group" 2>/dev/null || true
+      fi
+    done
+  done
+
+  # 3. Unregister app bundles from LaunchServices
+  for dir in "$CLAUDE_DIR/ClaudeNotifierPersistent.app" "$CLAUDE_DIR/ClaudeNotifierBanner.app" "$CLAUDE_DIR/ClaudeNotifier.app"; do
+    if [ -d "$dir" ]; then
+      "$LSREGISTER" -u "$dir" 2>/dev/null || true
+    fi
+  done
+
+  # 4. Delete notification files
+  rm -f "$CLAUDE_DIR/notify-click.sh" 2>/dev/null
+  rm -f "$CLAUDE_DIR/notify-config.json" 2>/dev/null
+  rm -f "$CLAUDE_DIR/config-ui.py" 2>/dev/null
+  rm -f "$CLAUDE_DIR/Claude.icns" 2>/dev/null
+  rm -f "$CLAUDE_DIR/claude-icon-large.png" 2>/dev/null
+  rm -f "$CLAUDE_DIR/Configure Notifications.command" 2>/dev/null
+  rm -f "$CLAUDE_DIR/.notify-installed" 2>/dev/null
+
+  # 5. Delete app bundles
+  rm -rf "$CLAUDE_DIR/ClaudeNotifierPersistent.app" 2>/dev/null
+  rm -rf "$CLAUDE_DIR/ClaudeNotifierBanner.app" 2>/dev/null
+  rm -rf "$CLAUDE_DIR/ClaudeNotifier.app" 2>/dev/null
+
+  # 6. Clean Notification Center database entries
+  local NCDB="$HOME/Library/Group Containers/group.com.apple.usernoted/db2/db"
+  if [ -f "$NCDB" ]; then
+    local nc_count
+    nc_count=$(sqlite3 "$NCDB" "SELECT COUNT(*) FROM app WHERE identifier LIKE 'com.anthropic.claude-code-notifier%';" 2>/dev/null || echo "0")
+    if [ "$nc_count" -gt 0 ]; then
+      killall usernoted 2>/dev/null || true
+      sleep 0.5
+      sqlite3 "$NCDB" "DELETE FROM app WHERE identifier LIKE 'com.anthropic.claude-code-notifier%';" 2>/dev/null || true
+      killall NotificationCenter 2>/dev/null || true
+    fi
+  fi
+
+  # 7. Delete notify.sh itself — safe because bash holds the fd open
+  rm -f "$CLAUDE_DIR/notify.sh" 2>/dev/null
+}
+
 INPUT=$(cat)
+
+# If the launcher app was dragged to Trash, clean up everything and exit
+if [ ! -d "/Applications/ClaudeNotifications.app" ] && [ -f "$HOME/.claude/.notify-installed" ]; then
+  _claude_notify_cleanup
+  exit 0
+fi
 
 # Parse hook event data and read config in a single python3 call
 # Outputs: EVENT_KEY ENABLED SOUND VOLUME STYLE SOUND_ENABLED TITLE BODY
