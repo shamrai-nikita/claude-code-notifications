@@ -125,6 +125,7 @@ for app in apps:
         flags |= targets[bid]
         flags |= ALLOW | SHOW_NC | BADGE | SOUND
         app['flags'] = flags
+        app['grouping'] = 2  # Notification grouping: Off
         configured.append(bid.split('-')[-1])  # 'persistent' or 'banner'
 
 if configured:
