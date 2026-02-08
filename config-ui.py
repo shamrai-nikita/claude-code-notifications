@@ -63,327 +63,413 @@ HTML_PAGE = r"""<!DOCTYPE html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Claude Code Notifications — Settings</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
-    --orange: #da7756;
-    --orange-light: #f0c4b4;
-    --orange-bg: #fdf6f3;
-    --gray-50: #f9fafb;
-    --gray-100: #f3f4f6;
-    --gray-200: #e5e7eb;
-    --gray-300: #d1d5db;
-    --gray-400: #9ca3af;
-    --gray-500: #6b7280;
-    --gray-700: #374151;
-    --gray-900: #111827;
-    --green: #059669;
-    --red: #dc2626;
+    --color-bg: #fafaf9;
+    --color-surface: #ffffff;
+    --color-accent: #d97757;
+    --color-accent-hover: #c4694d;
+    --color-accent-subtle: rgba(217,119,87,0.08);
+    --color-text: #1c1917;
+    --color-text-secondary: #78716c;
+    --color-text-tertiary: #a8a29e;
+    --color-border: #e7e5e4;
+    --color-border-strong: #d6d3d1;
+    --color-input-bg: #ffffff;
+    --color-toggle-off: #d6d3d1;
+    --color-toggle-knob: #ffffff;
+    --color-green: #059669;
+    --color-red: #dc2626;
+    --color-seg-bg: #f5f5f4;
+    --color-seg-active-bg: var(--color-accent);
+    --color-seg-active-text: #ffffff;
+  }
+  [data-theme="dark"] {
+    --color-bg: #0f0f12;
+    --color-surface: #1a1a1f;
+    --color-accent: #e88565;
+    --color-accent-hover: #d4764a;
+    --color-accent-subtle: rgba(232,133,101,0.1);
+    --color-text: #e7e5e4;
+    --color-text-secondary: #a8a29e;
+    --color-text-tertiary: #78716c;
+    --color-border: #2a2a30;
+    --color-border-strong: #3a3a42;
+    --color-input-bg: #141418;
+    --color-toggle-off: #3a3a42;
+    --color-toggle-knob: #e7e5e4;
+    --color-green: #34d399;
+    --color-red: #f87171;
+    --color-seg-bg: #141418;
+    --color-seg-active-bg: var(--color-accent);
+    --color-seg-active-text: #ffffff;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background: var(--gray-50);
-    color: var(--gray-900);
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--color-bg);
+    color: var(--color-text);
     line-height: 1.5;
-    padding: 2rem 1rem;
-    max-width: 720px;
+    padding: 2.5rem 1.25rem 3rem;
+    max-width: 640px;
     margin: 0 auto;
-  }
-  h1 {
-    font-size: 1.5rem;
-    font-weight: 600;
-    margin-bottom: 0.25rem;
-  }
-  .subtitle {
-    color: var(--gray-500);
-    font-size: 0.875rem;
-    margin-bottom: 1.5rem;
-  }
-  .card {
-    background: white;
-    border: 1px solid var(--gray-200);
-    border-radius: 0.75rem;
-    padding: 1.25rem;
-    margin-bottom: 1rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-    transition: opacity 0.2s;
-  }
-  .card.disabled { opacity: 0.5; }
-  .card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 0.75rem;
-  }
-  .card-title { font-weight: 600; font-size: 1rem; }
-  .card-desc { color: var(--gray-500); font-size: 0.8125rem; margin-top: 0.125rem; }
-  /* Toggle switch */
-  .toggle {
-    position: relative;
-    width: 44px; height: 24px;
-    flex-shrink: 0;
-  }
-  .toggle input { opacity: 0; width: 0; height: 0; }
-  .toggle .slider {
-    position: absolute; inset: 0;
-    background: var(--gray-300);
-    border-radius: 12px;
-    cursor: pointer;
-    transition: background 0.2s;
-  }
-  .toggle .slider::before {
-    content: "";
-    position: absolute;
-    width: 18px; height: 18px;
-    left: 3px; bottom: 3px;
-    background: white;
-    border-radius: 50%;
-    transition: transform 0.2s;
-  }
-  .toggle input:checked + .slider { background: var(--orange); }
-  .toggle input:checked + .slider::before { transform: translateX(20px); }
-
-  /* Controls grid */
-  .controls {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.75rem;
-    margin-top: 0.75rem;
-  }
-  .control-group { display: flex; flex-direction: column; gap: 0.25rem; }
-  .control-group.full-width { grid-column: 1 / -1; }
-  label {
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: var(--gray-500);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-  select, input[type=range] {
-    width: 100%;
-    height: 36px;
-    border: 1px solid var(--gray-200);
-    border-radius: 0.5rem;
-    padding: 0 0.5rem;
-    font-size: 0.875rem;
-    background: white;
-    color: var(--gray-900);
-  }
-  select:focus { outline: 2px solid var(--orange); outline-offset: -1px; }
-  input[type=range] {
-    -webkit-appearance: none;
-    border: none;
-    padding: 0;
-    background: transparent;
-    height: 36px;
-  }
-  input[type=range]::-webkit-slider-runnable-track {
-    height: 6px;
-    background: var(--gray-200);
-    border-radius: 3px;
-  }
-  input[type=range]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 18px; height: 18px;
-    background: var(--orange);
-    border-radius: 50%;
-    margin-top: -6px;
-    cursor: pointer;
-  }
-  .volume-row {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-  .volume-row input { flex: 1; }
-  .volume-val {
-    font-size: 0.8125rem;
-    color: var(--gray-500);
-    min-width: 1.5rem;
-    text-align: right;
+    -webkit-font-smoothing: antialiased;
   }
 
-  /* Radio group for style */
-  .radio-group {
-    display: flex;
-    gap: 0;
-    border: 1px solid var(--gray-200);
-    border-radius: 0.5rem;
-    overflow: hidden;
-    height: 36px;
-  }
-  .radio-group label {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.8125rem;
-    font-weight: 500;
-    text-transform: none;
-    letter-spacing: 0;
-    color: var(--gray-700);
-    cursor: pointer;
-    background: white;
-    transition: background 0.15s, color 0.15s;
-    border-right: 1px solid var(--gray-200);
-    user-select: none;
-  }
-  .radio-group label:last-child { border-right: none; }
-  .radio-group input { display: none; }
-  .radio-group input:checked + span {
-    /* parent label gets styled via JS */
-  }
-  .radio-group label.active {
-    background: var(--orange);
-    color: white;
-  }
-
-  /* Preview button */
-  .btn-preview {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.375rem;
-    height: 36px;
-    padding: 0 0.75rem;
-    border: 1px solid var(--gray-200);
-    border-radius: 0.5rem;
-    background: white;
-    color: var(--gray-700);
-    font-size: 0.8125rem;
-    cursor: pointer;
-    transition: border-color 0.15s;
-  }
-  .btn-preview:hover { border-color: var(--orange); }
-
-  /* Save area */
-  .save-area {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    margin-top: 1.5rem;
-  }
-  .btn-save {
-    height: 40px;
-    padding: 0 1.5rem;
-    background: var(--orange);
-    color: white;
-    border: none;
-    border-radius: 0.5rem;
-    font-size: 0.9375rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: opacity 0.15s;
-  }
-  .btn-save:hover { opacity: 0.9; }
-  .btn-save:active { opacity: 0.8; }
-  .save-msg {
-    font-size: 0.875rem;
-    font-weight: 500;
-    opacity: 0;
-    transition: opacity 0.3s;
-  }
-  .save-msg.show { opacity: 1; }
-  .save-msg.ok { color: var(--green); }
-  .save-msg.err { color: var(--red); }
-
-  .divider {
-    border: none;
-    border-top: 1px solid var(--gray-200);
-    margin: 1.5rem 0;
-  }
-
-  /* Global toggle bar */
-  .global-toggle-bar {
-    background: white;
-    border: 2px solid var(--orange-light);
-    border-radius: 0.75rem;
-    padding: 1rem 1.25rem;
-    margin-bottom: 1.25rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  .global-toggle-bar .global-label {
-    font-weight: 600;
-    font-size: 1rem;
-  }
-  .global-toggle-bar .global-sublabel {
-    font-size: 0.8125rem;
-    color: var(--gray-500);
-    margin-top: 0.125rem;
-  }
-  .global-disabled .card {
-    opacity: 0.45;
-    pointer-events: none;
-  }
-
-  /* Dark theme */
-  [data-theme="dark"] {
-    --gray-50: #0f1117;
-    --gray-100: #1a1d27;
-    --gray-200: #2d3348;
-    --gray-300: #3d4460;
-    --gray-400: #6b7280;
-    --gray-500: #9ca3af;
-    --gray-700: #d1d5db;
-    --gray-900: #e5e7eb;
-    --green: #34d399;
-    --red: #f87171;
-  }
-  [data-theme="dark"] .card {
-    background: #1e2130;
-  }
-  [data-theme="dark"] .global-toggle-bar {
-    background: #1e2130;
-    border-color: #5a3d30;
-  }
-  [data-theme="dark"] select {
-    background: #161825;
-    color: var(--gray-900);
-  }
-  [data-theme="dark"] .radio-group label {
-    background: #161825;
-    color: var(--gray-700);
-  }
-  [data-theme="dark"] .radio-group label.active {
-    background: var(--orange);
-    color: white;
-  }
-  [data-theme="dark"] .btn-preview {
-    background: #161825;
-    color: var(--gray-700);
-  }
-  [data-theme="dark"] .btn-save {
-    background: var(--orange);
-    color: white;
-  }
-  [data-theme="dark"] .toggle .slider::before {
-    background: #e5e7eb;
-  }
-
-  /* Theme toggle */
+  /* Header */
   .header-row {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
+    margin-bottom: 1.75rem;
+  }
+  h1 {
+    font-size: 1.375rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin-bottom: 0.25rem;
+  }
+  .subtitle {
+    color: var(--color-text-secondary);
+    font-size: 0.8125rem;
   }
   .theme-toggle {
     display: inline-flex;
     align-items: center;
     gap: 0.375rem;
-    height: 32px;
+    height: 30px;
     padding: 0 0.625rem;
-    border: 1px solid var(--gray-200);
-    border-radius: 0.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.375rem;
     background: transparent;
-    color: var(--gray-500);
-    font-size: 0.8125rem;
+    color: var(--color-text-secondary);
+    font-family: inherit;
+    font-size: 0.75rem;
+    font-weight: 500;
     cursor: pointer;
-    transition: border-color 0.15s;
+    transition: border-color 0.15s ease, color 0.15s ease;
     flex-shrink: 0;
   }
-  .theme-toggle:hover { border-color: var(--orange); }
+  .theme-toggle:hover { border-color: var(--color-accent); color: var(--color-accent); }
+
+  /* Toggle switch — compact 40x22 */
+  .toggle {
+    position: relative;
+    width: 40px; height: 22px;
+    flex-shrink: 0;
+  }
+  .toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+  .toggle .slider {
+    position: absolute; inset: 0;
+    background: var(--color-toggle-off);
+    border-radius: 11px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  .toggle .slider::before {
+    content: "";
+    position: absolute;
+    width: 16px; height: 16px;
+    left: 3px; top: 3px;
+    background: var(--color-toggle-knob);
+    border-radius: 50%;
+    transition: transform 0.15s ease;
+  }
+  .toggle input:checked + .slider { background: var(--color-accent); }
+  .toggle input:checked + .slider::before { transform: translateX(18px); }
+
+  /* Global toggle row */
+  .global-toggle-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.875rem 0;
+    border-bottom: 1px solid var(--color-border);
+    margin-bottom: 1.25rem;
+  }
+  .global-toggle-row .global-label {
+    font-weight: 600;
+    font-size: 0.9375rem;
+  }
+
+  /* Events container */
+  .events-container { transition: opacity 0.15s ease; }
+  .events-container.disabled {
+    opacity: 0.35;
+    pointer-events: none;
+  }
+
+  /* Event section */
+  .event-section {
+    padding: 1rem 0;
+    transition: opacity 0.15s ease;
+  }
+  .event-section + .event-section {
+    border-top: 1px solid var(--color-border);
+  }
+  .event-section.disabled .event-controls { opacity: 0.35; pointer-events: none; }
+  .event-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.625rem;
+  }
+  .event-name {
+    font-weight: 600;
+    font-size: 0.8125rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--color-text);
+  }
+  .event-desc {
+    color: var(--color-text-tertiary);
+    font-size: 0.75rem;
+    margin-top: 0.125rem;
+  }
+
+  /* Controls row */
+  .event-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    transition: opacity 0.15s ease;
+  }
+  .controls-row {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    flex-wrap: wrap;
+  }
+
+  /* Select */
+  select {
+    height: 32px;
+    width: 120px;
+    border: 1px solid var(--color-border);
+    border-radius: 0.375rem;
+    padding: 0 0.5rem;
+    font-family: inherit;
+    font-size: 0.8125rem;
+    background: var(--color-input-bg);
+    color: var(--color-text);
+    cursor: pointer;
+    transition: border-color 0.15s ease;
+    -webkit-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2378716c'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    padding-right: 1.5rem;
+  }
+  select:focus { outline: 2px solid var(--color-accent); outline-offset: -1px; }
+  select:disabled { opacity: 0.35; cursor: default; }
+
+  /* Volume slider */
+  .volume-group {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    flex: 1;
+    min-width: 120px;
+    max-width: 200px;
+  }
+  input[type=range] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 20px;
+    background: transparent;
+    cursor: pointer;
+  }
+  input[type=range]:disabled { opacity: 0.35; cursor: default; }
+  input[type=range]::-webkit-slider-runnable-track {
+    height: 4px;
+    background: var(--color-border-strong);
+    border-radius: 2px;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    background: var(--color-accent);
+    border-radius: 50%;
+    margin-top: -5px;
+    cursor: pointer;
+    transition: transform 0.1s ease;
+  }
+  input[type=range]::-webkit-slider-thumb:hover {
+    transform: scale(1.15);
+  }
+  input[type=range]::-moz-range-track {
+    height: 4px;
+    background: var(--color-border-strong);
+    border-radius: 2px;
+    border: none;
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 14px; height: 14px;
+    background: var(--color-accent);
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+  }
+  .volume-val {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    min-width: 1.25rem;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Segmented control */
+  .seg-control {
+    display: inline-flex;
+    border: 1px solid var(--color-border);
+    border-radius: 0.375rem;
+    overflow: hidden;
+    height: 32px;
+  }
+  .seg-control label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    background: var(--color-seg-bg);
+    transition: background 0.15s ease, color 0.15s ease;
+    user-select: none;
+    border-right: 1px solid var(--color-border);
+    white-space: nowrap;
+  }
+  .seg-control label:last-child { border-right: none; }
+  .seg-control input { display: none; }
+  .seg-control label.active {
+    background: var(--color-seg-active-bg);
+    color: var(--color-seg-active-text);
+  }
+
+  /* Sound-enabled + Preview row */
+  .controls-row-secondary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .sound-toggle-group {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    transition: opacity 0.15s ease;
+  }
+  .sound-toggle-group .speaker-icon {
+    font-size: 0.875rem;
+    color: var(--color-text-secondary);
+    line-height: 1;
+  }
+  .sound-controls-dim { opacity: 0.35; }
+
+  /* Preview button */
+  .btn-preview {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    height: 28px;
+    padding: 0 0.625rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.375rem;
+    background: transparent;
+    color: var(--color-text-secondary);
+    font-family: inherit;
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease;
+  }
+  .btn-preview:hover { border-color: var(--color-accent); color: var(--color-accent); }
+  .btn-preview:disabled { opacity: 0.35; cursor: default; }
+  .btn-preview:disabled:hover { border-color: var(--color-border); color: var(--color-text-secondary); }
+  .btn-preview .play-icon { font-size: 0.625rem; }
+
+  /* Save area */
+  .save-area {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+  }
+  .btn-save {
+    position: relative;
+    height: 36px;
+    padding: 0 1.25rem;
+    background: var(--color-accent);
+    color: #fff;
+    border: none;
+    border-radius: 0.375rem;
+    font-family: inherit;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s ease;
+  }
+  .btn-save:hover { background: var(--color-accent-hover); }
+  .btn-save:active { transform: scale(0.98); }
+  .btn-save .dirty-dot {
+    position: absolute;
+    top: -3px; right: -3px;
+    width: 8px; height: 8px;
+    background: var(--color-accent);
+    border: 2px solid var(--color-bg);
+    border-radius: 50%;
+    display: none;
+  }
+  .btn-save.has-changes .dirty-dot { display: block; }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    top: 1.25rem;
+    right: 1.25rem;
+    padding: 0.625rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    font-family: inherit;
+    transform: translateY(-0.5rem);
+    opacity: 0;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+    pointer-events: none;
+    z-index: 100;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.ok {
+    background: var(--color-green);
+    color: #fff;
+  }
+  .toast.err {
+    background: var(--color-red);
+    color: #fff;
+  }
+
+  /* Responsive */
+  @media (max-width: 600px) {
+    body { padding: 1.5rem 1rem 2rem; }
+    .controls-row { flex-direction: column; align-items: stretch; gap: 0.5rem; }
+    .controls-row > * { width: 100%; }
+    select { width: 100%; }
+    .volume-group { max-width: none; }
+    .seg-control { width: 100%; }
+    .seg-control label { flex: 1; }
+    .controls-row-secondary { flex-direction: column; align-items: stretch; gap: 0.5rem; }
+    .save-area { justify-content: stretch; }
+    .btn-save { width: 100%; }
+  }
 </style>
 </head>
 <body>
@@ -391,12 +477,13 @@ HTML_PAGE = r"""<!DOCTYPE html>
 <div class="header-row">
   <div>
     <h1>Claude Code Notifications</h1>
-    <p class="subtitle">Configure notification sounds, volume, and alert styles.</p>
+    <p class="subtitle">Configure sounds, volume, and alert styles.</p>
   </div>
   <button class="theme-toggle" onclick="toggleTheme()" id="theme-btn" title="Toggle dark/light theme"></button>
 </div>
 
 <div id="app">Loading...</div>
+<div class="toast" id="toast"></div>
 
 <script>
 // Theme management
@@ -423,11 +510,21 @@ const EVENT_META = %%EVENT_META%%;
 const EVENT_ORDER = %%EVENT_ORDER%%;
 
 let config = null;
+let savedSnapshot = '';
+let isDirty = false;
 
 async function loadConfig() {
   const res = await fetch('/api/config');
   config = await res.json();
+  savedSnapshot = JSON.stringify(config);
+  isDirty = false;
   render();
+}
+
+function markDirty() {
+  isDirty = JSON.stringify(config) !== savedSnapshot;
+  const btn = document.querySelector('.btn-save');
+  if (btn) btn.classList.toggle('has-changes', isDirty);
 }
 
 function getEventVal(key, field) {
@@ -444,10 +541,12 @@ function setEventVal(key, field, value) {
   if (!config.events) config.events = {};
   if (!config.events[key]) config.events[key] = {};
   config.events[key][field] = value;
+  markDirty();
 }
 
 function toggleGlobal(checked) {
   config.global_enabled = checked;
+  markDirty();
   render();
 }
 
@@ -456,20 +555,17 @@ function render() {
   const globalOn = config.global_enabled !== undefined ? config.global_enabled : true;
   let html = '';
 
-  // Global toggle bar
-  html += `<div class="global-toggle-bar">
-    <div>
-      <div class="global-label">Enable Notifications</div>
-      <div class="global-sublabel">Master switch for all notifications</div>
-    </div>
+  // Global toggle row
+  html += `<div class="global-toggle-row">
+    <span class="global-label">Enable Notifications</span>
     <label class="toggle">
       <input type="checkbox" ${globalOn?'checked':''} onchange="toggleGlobal(this.checked)">
       <span class="slider"></span>
     </label>
   </div>`;
 
-  // Event cards (wrapped in container for global disable)
-  html += `<div class="${globalOn?'':'global-disabled'}">`;
+  // Events container
+  html += `<div class="events-container ${globalOn?'':'disabled'}">`;
 
   for (const key of EVENT_ORDER) {
     const meta = EVENT_META[key] || {label: key, description: ''};
@@ -480,65 +576,56 @@ function render() {
     const soundOn = getEventVal(key, 'sound_enabled');
     const soundCtrlOff = !enabled || !soundOn;
 
-    html += `<div class="card ${enabled?'':'disabled'}" id="card-${key}">
-      <div class="card-header">
+    html += `<div class="event-section ${enabled?'':'disabled'}" id="evt-${key}">
+      <div class="event-header">
         <div>
-          <div class="card-title">${meta.label}</div>
-          <div class="card-desc">${meta.description}</div>
+          <div class="event-name">${meta.label}</div>
+          <div class="event-desc">${meta.description}</div>
         </div>
         <label class="toggle">
           <input type="checkbox" ${enabled?'checked':''} onchange="toggleEvent('${key}',this.checked)">
           <span class="slider"></span>
         </label>
       </div>
-      <div class="controls">
-        <div class="control-group">
-          <label>Sound</label>
+      <div class="event-controls">
+        <div class="controls-row">
           <select id="sound-${key}" onchange="setEventVal('${key}','sound',this.value)" ${soundCtrlOff?'disabled':''}>
             ${SOUNDS.map(s => `<option value="${s}" ${s===sound?'selected':''}>${s}</option>`).join('')}
           </select>
-        </div>
-        <div class="control-group">
-          <label>Volume</label>
-          <div class="volume-row">
+          <div class="volume-group ${soundCtrlOff?'sound-controls-dim':''}">
             <input type="range" id="vol-${key}" min="1" max="20" value="${volume}" ${soundCtrlOff?'disabled':''}
               oninput="setEventVal('${key}','volume',+this.value);this.nextElementSibling.textContent=this.value">
             <span class="volume-val">${volume}</span>
           </div>
-        </div>
-        <div class="control-group">
-          <label>Style</label>
-          <div class="radio-group" id="style-${key}">
+          <div class="seg-control" id="style-${key}">
             <label class="${style==='persistent'?'active':''}"
-              onclick="if(!this.closest('.card').classList.contains('disabled')){setRadio('style-${key}','persistent');setEventVal('${key}','style','persistent')}">
+              onclick="if(!this.closest('.event-section').classList.contains('disabled')){setRadio('style-${key}','persistent');setEventVal('${key}','style','persistent')}">
               <input type="radio" name="style-${key}" value="persistent" ${style==='persistent'?'checked':''} ${enabled?'':'disabled'}><span>Persistent</span>
             </label>
             <label class="${style==='banner'?'active':''}"
-              onclick="if(!this.closest('.card').classList.contains('disabled')){setRadio('style-${key}','banner');setEventVal('${key}','style','banner')}">
+              onclick="if(!this.closest('.event-section').classList.contains('disabled')){setRadio('style-${key}','banner');setEventVal('${key}','style','banner')}">
               <input type="radio" name="style-${key}" value="banner" ${style==='banner'?'checked':''} ${enabled?'':'disabled'}><span>Banner</span>
             </label>
           </div>
         </div>
-        <div class="control-group">
-          <label>Sound Enabled</label>
-          <label class="toggle">
-            <input type="checkbox" ${soundOn?'checked':''} ${enabled?'':'disabled'} onchange="setEventVal('${key}','sound_enabled',this.checked);render()">
-            <span class="slider"></span>
-          </label>
-        </div>
-        <div class="control-group">
-          <label>&nbsp;</label>
-          <button class="btn-preview" onclick="preview(getEvtSound('${key}'),getEvtVol('${key}'),getEventVal('${key}','style'),'${key}',${soundOn})" ${enabled?'':'disabled'}>&#9654; Preview</button>
+        <div class="controls-row-secondary">
+          <div class="sound-toggle-group">
+            <span class="speaker-icon">${soundOn ? '\uD83D\uDD0A' : '\uD83D\uDD07'}</span>
+            <label class="toggle">
+              <input type="checkbox" ${soundOn?'checked':''} ${enabled?'':'disabled'} onchange="setEventVal('${key}','sound_enabled',this.checked);render()">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <button class="btn-preview" onclick="previewEvt(this,'${key}')" ${enabled?'':'disabled'}><span class="play-icon">&#9654;</span> Preview</button>
         </div>
       </div>
     </div>`;
   }
 
-  html += `</div>`; // close global-disabled wrapper
+  html += `</div>`; // close events-container
 
   html += `<div class="save-area">
-    <button class="btn-save" onclick="saveConfig()">Save Settings</button>
-    <span class="save-msg" id="save-msg"></span>
+    <button class="btn-save ${isDirty?'has-changes':''}" onclick="saveConfig()">Save Settings<span class="dirty-dot"></span></button>
   </div>`;
 
   app.innerHTML = html;
@@ -576,8 +663,26 @@ async function preview(sound, volume, style, eventKey, soundEnabled) {
   });
 }
 
+async function previewEvt(btn, key) {
+  const origText = btn.innerHTML;
+  btn.innerHTML = '<span class="play-icon">&#8987;</span> ...';
+  btn.disabled = true;
+  try {
+    await preview(getEvtSound(key), getEvtVol(key), getEventVal(key,'style'), key, getEventVal(key,'sound_enabled'));
+  } finally {
+    setTimeout(() => { btn.innerHTML = origText; btn.disabled = false; }, 400);
+  }
+}
+
+function showToast(message, type) {
+  const toast = document.getElementById('toast');
+  toast.textContent = message;
+  toast.className = 'toast ' + type;
+  requestAnimationFrame(() => { toast.classList.add('show'); });
+  setTimeout(() => { toast.classList.remove('show'); }, 2500);
+}
+
 async function saveConfig() {
-  const msg = document.getElementById('save-msg');
   try {
     const res = await fetch('/api/config', {
       method: 'POST',
@@ -585,14 +690,23 @@ async function saveConfig() {
       body: JSON.stringify(config),
     });
     if (!res.ok) throw new Error(await res.text());
-    msg.textContent = 'Saved!';
-    msg.className = 'save-msg show ok';
+    savedSnapshot = JSON.stringify(config);
+    isDirty = false;
+    const btn = document.querySelector('.btn-save');
+    if (btn) btn.classList.remove('has-changes');
+    showToast('Settings saved', 'ok');
   } catch (e) {
-    msg.textContent = 'Error: ' + e.message;
-    msg.className = 'save-msg show err';
+    showToast('Error: ' + e.message, 'err');
   }
-  setTimeout(() => { msg.classList.remove('show'); }, 2500);
 }
+
+// Keyboard shortcut: Cmd+S / Ctrl+S to save
+document.addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+    e.preventDefault();
+    saveConfig();
+  }
+});
 
 loadConfig();
 
