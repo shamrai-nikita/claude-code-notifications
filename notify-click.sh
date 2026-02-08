@@ -9,6 +9,10 @@
 
 TERM_APP="${1:-}"
 TAB_ID="${2:-}"
+SESSION_ID="${3:-}"
+
+# Clear persistent notification marker (user clicked the notification directly)
+[ -n "$SESSION_ID" ] && rm -f "$HOME/.claude/.persistent-notifications/$SESSION_ID" 2>/dev/null
 
 case "$TERM_APP" in
   iTerm.app)

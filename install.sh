@@ -201,7 +201,7 @@ hook_entry = lambda: [{'matcher': '', 'hooks': [{'type': 'command', 'command': '
 # Merge hooks — add missing ones, preserve existing
 hooks = settings.get('hooks', {})
 added = []
-for event in ['Notification', 'PermissionRequest', 'Stop']:
+for event in ['Notification', 'PermissionRequest', 'Stop', 'PostToolUse', 'UserPromptSubmit']:
     if event not in hooks:
         hooks[event] = hook_entry()
         added.append(event)

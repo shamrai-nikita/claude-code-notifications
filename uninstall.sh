@@ -23,6 +23,7 @@ DIRS_TO_REMOVE=(
   "$CLAUDE_DIR/ClaudeNotifications.app"
   "/Applications/ClaudeNotifications.app"
   "$CLAUDE_DIR/.notify-uninstall.lock"
+  "$CLAUDE_DIR/.persistent-notifications"
 )
 
 echo "=== Claude Code Notifications Uninstaller ==="
@@ -62,7 +63,7 @@ with open(path) as f:
 
 hooks = settings.get('hooks', {})
 changed = False
-for event in ['Notification', 'PermissionRequest', 'Stop']:
+for event in ['Notification', 'PermissionRequest', 'Stop', 'PostToolUse', 'UserPromptSubmit']:
     if event in hooks:
         filtered = [
             entry for entry in hooks[event]

@@ -35,7 +35,7 @@ with open(path) as f:
     settings = json.load(f)
 hooks = settings.get('hooks', {})
 changed = False
-for event in ['Notification', 'PermissionRequest', 'Stop']:
+for event in ['Notification', 'PermissionRequest', 'Stop', 'PostToolUse', 'UserPromptSubmit']:
     if event in hooks:
         filtered = [
             entry for entry in hooks[event]
@@ -86,6 +86,7 @@ if changed:
   rm -f "$CLAUDE_DIR/claude-icon-large.png" 2>/dev/null
   rm -f "$CLAUDE_DIR/Configure Notifications.command" 2>/dev/null
   rm -f "$CLAUDE_DIR/.notify-installed" 2>/dev/null
+  rm -rf "$CLAUDE_DIR/.persistent-notifications" 2>/dev/null
 
   # 5. Delete app bundles
   rm -rf "$CLAUDE_DIR/ClaudeNotifierPersistent.app" 2>/dev/null
@@ -117,8 +118,26 @@ if [ ! -d "/Applications/ClaudeNotifications.app" ] && [ -f "$HOME/.claude/.noti
   exit 0
 fi
 
+# --- Auto-dismiss: resolve stale persistent notifications ---
+# PostToolUse = permission was granted and tool ran. UserPromptSubmit = user responded.
+MARKER_DIR="$HOME/.claude/.persistent-notifications"
+if [[ "$INPUT" == *'"PostToolUse"'* ]] || [[ "$INPUT" == *'"UserPromptSubmit"'* ]]; then
+  if [ -d "$MARKER_DIR" ] && [ -n "$(ls "$MARKER_DIR" 2>/dev/null)" ]; then
+    if [[ "$INPUT" =~ \"session_id\"[[:space:]]*:[[:space:]]*\"([^\"]+)\" ]]; then
+      SID="${BASH_REMATCH[1]}"
+      if [ -f "$MARKER_DIR/$SID" ]; then
+        GROUP=$(cat "$MARKER_DIR/$SID")
+        rm -f "$MARKER_DIR/$SID"
+        [ -x "$NOTIFIER_PERSISTENT" ] && "$NOTIFIER_PERSISTENT" -remove "$GROUP" 2>/dev/null
+        [ -x "$NOTIFIER_LEGACY" ] && "$NOTIFIER_LEGACY" -remove "claude-code" 2>/dev/null
+      fi
+    fi
+  fi
+  exit 0
+fi
+
 # Parse hook event data and read config in a single python3 call
-# Outputs: EVENT_KEY ENABLED SOUND VOLUME STYLE SOUND_ENABLED TITLE BODY
+# Outputs: EVENT_KEY ENABLED SOUND VOLUME STYLE SOUND_ENABLED TITLE BODY SESSION_ID
 eval $(CLAUDE_HOOK_INPUT="$INPUT" python3 -c "
 import sys, json, os
 
@@ -127,6 +146,7 @@ event = hook.get('hook_event_name', '')
 message = hook.get('message', '')
 notif_type = hook.get('notification_type', '')
 tool_name = hook.get('tool_name', '')
+session_id = hook.get('session_id', '')
 
 # Load config
 config_path = os.path.expanduser('$CONFIG')
@@ -187,6 +207,7 @@ print(f\"STYLE='{style}'\")
 print(f\"SOUND_ENABLED={'1' if sound_enabled else '0'}\")
 print(f\"TITLE='{title}'\")
 print(f\"BODY='{body}'\")
+print(f\"SESSION_ID='{session_id}'\")
 " 2>/dev/null)
 
 # Exit if this event is disabled
@@ -203,6 +224,11 @@ else
   NOTIFIER="$NOTIFIER_PERSISTENT"
   GROUP="claude-code-persistent"
   SENDER="com.anthropic.claude-code-notifier-persistent"
+fi
+
+# Per-session group for independent multi-session notifications
+if [ -n "$SESSION_ID" ]; then
+  GROUP="${GROUP}-${SESSION_ID}"
 fi
 
 # Fallback: try legacy ClaudeNotifier.app if selected variant doesn't exist
@@ -222,6 +248,14 @@ case "$TERM_APP" in
   *)              TAB_ID="" ;;
 esac
 
+# Dismiss this session's previous persistent notification (if any)
+if [ -n "$SESSION_ID" ] && [ -f "$MARKER_DIR/$SESSION_ID" ]; then
+  OLD_GROUP=$(cat "$MARKER_DIR/$SESSION_ID")
+  rm -f "$MARKER_DIR/$SESSION_ID"
+  [ -x "$NOTIFIER_PERSISTENT" ] && "$NOTIFIER_PERSISTENT" -remove "$OLD_GROUP" 2>/dev/null
+  [ -x "$NOTIFIER_LEGACY" ] && "$NOTIFIER_LEGACY" -remove "claude-code" 2>/dev/null
+fi
+
 # Send notification — clicking it activates the terminal and switches to the correct tab
 # -sender forces macOS to use our app's icon (same binary UUID as original terminal-notifier)
 if [ -n "$TERM_APP" ]; then
@@ -229,7 +263,7 @@ if [ -n "$TERM_APP" ]; then
     -title "$TITLE" \
     -message "$BODY" \
     -sender "$SENDER" \
-    -execute "bash $HOME/.claude/notify-click.sh '$TERM_APP' '$TAB_ID'" \
+    -execute "bash $HOME/.claude/notify-click.sh '$TERM_APP' '$TAB_ID' '$SESSION_ID'" \
     -group "$GROUP" \
     2>/dev/null
 else
@@ -240,6 +274,12 @@ else
     -sender "$SENDER" \
     -group "$GROUP" \
     2>/dev/null
+fi
+
+# Track active persistent notification for auto-dismiss
+if [ "$STYLE" != "banner" ] && [ -n "$SESSION_ID" ]; then
+  mkdir -p "$MARKER_DIR"
+  echo "$GROUP" > "$MARKER_DIR/$SESSION_ID"
 fi
 
 # Play alert sound at configured volume (if sound is enabled)
