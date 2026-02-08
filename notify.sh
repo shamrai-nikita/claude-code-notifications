@@ -121,16 +121,30 @@ fi
 # --- Auto-dismiss: resolve stale persistent notifications ---
 # PostToolUse = permission was granted and tool ran. UserPromptSubmit = user responded.
 MARKER_DIR="$HOME/.claude/.persistent-notifications"
+# Stable process ID: grandparent PID persists across context clears within the same
+# Claude Code instance, but differs between terminals (no cross-session interference).
+STABLE_PID=$(ps -o ppid= -p $PPID 2>/dev/null | tr -d ' ')
 if [[ "$INPUT" == *'"PostToolUse"'* ]] || [[ "$INPUT" == *'"UserPromptSubmit"'* ]]; then
-  if [ -d "$MARKER_DIR" ] && [ -n "$(ls "$MARKER_DIR" 2>/dev/null)" ]; then
+  if [ -d "$MARKER_DIR" ]; then
+    # Try session_id match first (normal case)
+    DISMISS_GROUP=""
     if [[ "$INPUT" =~ \"session_id\"[[:space:]]*:[[:space:]]*\"([^\"]+)\" ]]; then
       SID="${BASH_REMATCH[1]}"
       if [ -f "$MARKER_DIR/$SID" ]; then
-        GROUP=$(cat "$MARKER_DIR/$SID")
+        DISMISS_GROUP=$(cat "$MARKER_DIR/$SID")
         rm -f "$MARKER_DIR/$SID"
-        [ -x "$NOTIFIER_PERSISTENT" ] && "$NOTIFIER_PERSISTENT" -remove "$GROUP" 2>/dev/null
-        [ -x "$NOTIFIER_LEGACY" ] && "$NOTIFIER_LEGACY" -remove "claude-code" 2>/dev/null
       fi
+    fi
+    # Fallback: try stable process ID (handles context-clear case where session_id changed)
+    if [ -z "$DISMISS_GROUP" ] && [ -n "$STABLE_PID" ] && [ -f "$MARKER_DIR/pid-$STABLE_PID" ]; then
+      DISMISS_GROUP=$(cat "$MARKER_DIR/pid-$STABLE_PID")
+    fi
+    # Always clean up the pid marker for this instance
+    [ -n "$STABLE_PID" ] && rm -f "$MARKER_DIR/pid-$STABLE_PID"
+    # Dismiss the notification
+    if [ -n "$DISMISS_GROUP" ]; then
+      [ -x "$NOTIFIER_PERSISTENT" ] && "$NOTIFIER_PERSISTENT" -remove "$DISMISS_GROUP" 2>/dev/null
+      [ -x "$NOTIFIER_LEGACY" ] && "$NOTIFIER_LEGACY" -remove "claude-code" 2>/dev/null
     fi
   fi
   exit 0
@@ -252,6 +266,7 @@ esac
 if [ -n "$SESSION_ID" ] && [ -f "$MARKER_DIR/$SESSION_ID" ]; then
   OLD_GROUP=$(cat "$MARKER_DIR/$SESSION_ID")
   rm -f "$MARKER_DIR/$SESSION_ID"
+  [ -n "$STABLE_PID" ] && rm -f "$MARKER_DIR/pid-$STABLE_PID"
   [ -x "$NOTIFIER_PERSISTENT" ] && "$NOTIFIER_PERSISTENT" -remove "$OLD_GROUP" 2>/dev/null
   [ -x "$NOTIFIER_LEGACY" ] && "$NOTIFIER_LEGACY" -remove "claude-code" 2>/dev/null
 fi
@@ -280,6 +295,7 @@ fi
 if [ "$STYLE" != "banner" ] && [ -n "$SESSION_ID" ]; then
   mkdir -p "$MARKER_DIR"
   echo "$GROUP" > "$MARKER_DIR/$SESSION_ID"
+  [ -n "$STABLE_PID" ] && echo "$GROUP" > "$MARKER_DIR/pid-$STABLE_PID"
 fi
 
 # Play alert sound at configured volume (if sound is enabled)
