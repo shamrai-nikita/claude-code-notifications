@@ -199,14 +199,14 @@ else:
 # Check global kill switch
 if not config.get('global_enabled', True):
     enabled = False
-    sound = 'Funk'; volume = 7; style = 'persistent'; sound_enabled = True
+    sound = 'Funk'; volume = 7; style = 'banner'; sound_enabled = True
 else:
     # Get per-event config
     evt = events_config.get(event_key, {})
     enabled = evt.get('enabled', event_key in events_config)
     sound = evt.get('sound', 'Funk')
     volume = evt.get('volume', 7)
-    style = evt.get('style', 'persistent')
+    style = evt.get('style', 'banner')
     sound_enabled = evt.get('sound_enabled', True)
 
 # Escape single quotes for shell

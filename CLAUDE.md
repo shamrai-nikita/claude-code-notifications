@@ -73,11 +73,11 @@ Clicking a notification activates the terminal and switches to the correct tab. 
 {
   "default_sound": "Funk",
   "default_volume": 7,
-  "default_style": "persistent",
+  "default_style": "banner",
   "default_sound_enabled": true,
   "events": {
-    "permission_request": { "enabled": true, "sound": "Funk", "volume": 7, "style": "persistent", "sound_enabled": true },
-    "elicitation_dialog": { "enabled": true, "sound": "Glass", "volume": 7, "style": "persistent", "sound_enabled": true },
+    "permission_request": { "enabled": true, "sound": "Funk", "volume": 7, "style": "banner", "sound_enabled": true },
+    "elicitation_dialog": { "enabled": true, "sound": "Glass", "volume": 7, "style": "banner", "sound_enabled": true },
     "stop":               { "enabled": true, "sound": "Hero", "volume": 7, "style": "banner", "sound_enabled": true }
   }
 }
@@ -89,7 +89,7 @@ Clicking a notification activates the terminal and switches to the correct tab. 
 - **`style`**: `"persistent"` (stays on screen) or `"banner"` (auto-dismisses)
 - **`sound_enabled`**: `true`/`false` — when false, notification is shown but no sound is played
 - **`default_sound_enabled`**: fallback for events that don't specify `sound_enabled` (defaults to `true` if missing)
-- Per-event settings fall back to `default_sound`/`default_volume`/`default_style`/`default_sound_enabled`, then hardcoded defaults (Funk/10/persistent/true)
+- Per-event settings fall back to `default_sound`/`default_volume`/`default_style`/`default_sound_enabled`, then hardcoded defaults (Funk/10/banner/true)
 - **Backward compat**: Missing `style` or `sound_enabled` fields default to their respective `default_*` values. Existing configs work unchanged.
 
 ## Settings UI

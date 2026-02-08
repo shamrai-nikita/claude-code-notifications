@@ -21,8 +21,8 @@ Restart any running Claude Code sessions.
 
 | Event | Description | Default style |
 |---|---|---|
-| Permission request | Claude needs you to approve an action | Persistent |
-| Question | Claude is asking you something | Persistent |
+| Permission request | Claude needs you to approve an action | Temporary |
+| Question | Claude is asking you something | Temporary |
 | Done | Claude finished responding | Temporary |
 
 ## Settings

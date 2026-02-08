@@ -51,8 +51,8 @@ EVENT_ORDER = ["permission_request", "elicitation_dialog", "stop"]
 DEFAULT_CONFIG = {
     "global_enabled": True,
     "events": {
-        "permission_request": {"enabled": True, "sound": "Funk", "volume": 7, "style": "persistent", "sound_enabled": True},
-        "elicitation_dialog": {"enabled": True, "sound": "Glass", "volume": 7, "style": "persistent", "sound_enabled": True},
+        "permission_request": {"enabled": True, "sound": "Funk", "volume": 7, "style": "banner", "sound_enabled": True},
+        "elicitation_dialog": {"enabled": True, "sound": "Glass", "volume": 7, "style": "banner", "sound_enabled": True},
         "stop": {"enabled": True, "sound": "Hero", "volume": 7, "style": "banner", "sound_enabled": True},
     },
 }
@@ -659,7 +659,7 @@ function render() {
                 <input type="radio" name="style-${key}" value="banner" ${style==='banner'?'checked':''} ${enabled?'':'disabled'}><span>Temporary</span>
               </label>
             </div>
-            <span class="info-icon">i<span class="info-tooltip"><strong>Persistent</strong> notification stays until you manually close it.<br><strong>Temporary</strong> notification vanishes on its own in 4 seconds.</span></span>
+            <span class="info-icon">i<span class="info-tooltip"><strong>Persistent</strong> stays on screen until resolved or dismissed.<br><strong>Temporary</strong> auto-dismisses after a few seconds.</span></span>
           </div>
         </div>
         <div class="controls-row-secondary">

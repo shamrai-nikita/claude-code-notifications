@@ -2,21 +2,21 @@
   "global_enabled": true,
   "default_sound": "Funk",
   "default_volume": 7,
-  "default_style": "persistent",
+  "default_style": "banner",
   "default_sound_enabled": true,
   "events": {
     "permission_request": {
       "enabled": true,
       "sound": "Funk",
       "volume": 7,
-      "style": "persistent",
+      "style": "banner",
       "sound_enabled": true
     },
     "elicitation_dialog": {
       "enabled": true,
       "sound": "Glass",
       "volume": 7,
-      "style": "persistent",
+      "style": "banner",
       "sound_enabled": true
     },
     "stop": {
