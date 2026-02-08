@@ -19,6 +19,8 @@ DIRS_TO_REMOVE=(
   "$CLAUDE_DIR/ClaudeNotifierPersistent.app"
   "$CLAUDE_DIR/ClaudeNotifierBanner.app"
   "$CLAUDE_DIR/ClaudeNotifier.app"
+  "$CLAUDE_DIR/ClaudeNotifications.app"
+  "/Applications/ClaudeNotifications.app"
 )
 
 echo "=== Claude Code Notifications Uninstaller ==="
@@ -28,7 +30,7 @@ echo "  - Notification hooks from ~/.claude/settings.json"
 echo "  - notify.sh, notify-config.json, config-ui.py"
 echo "  - ClaudeNotifier*.app bundles"
 echo "  - Claude icon files"
-echo "  - Configure Notifications.command"
+echo "  - ClaudeNotifications.app launcher (from /Applications/ and ~/.claude/)"
 echo "  - Notification Center entries (System Settings > Notifications)"
 echo ""
 echo "Will NOT remove:"

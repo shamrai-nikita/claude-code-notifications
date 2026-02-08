@@ -1,6 +1,6 @@
 # Claude Code Notifications — macOS
 
-Native macOS notification system for Claude Code. Shows notifications with Claude icon and configurable sounds when Claude needs attention or finishes a task. Supports per-event persistent or banner alert styles.
+Native macOS notification system for Claude Code. Shows notifications with a custom bell-with-sparkle icon and configurable sounds when Claude needs attention or finishes a task. Supports per-event persistent or banner alert styles.
 
 ## Architecture
 
@@ -10,7 +10,6 @@ Native macOS notification system for Claude Code. Shows notifications with Claud
 ├── notify-click.sh                 # Click handler — activates terminal + switches tab
 ├── notify-config.json              # User config (sounds, volume, style, enable/disable per event)
 ├── config-ui.py                    # Browser-based settings UI (python3, zero deps, auto-shutdown)
-├── Configure Notifications.command # Double-click to open settings UI
 ├── ClaudeNotifierPersistent.app/   # Persistent alert style (stays on screen)
 │   └── Contents/
 │       ├── Info.plist              # Bundle ID: com.anthropic.claude-code-notifier-persistent
@@ -21,8 +20,11 @@ Native macOS notification system for Claude Code. Shows notifications with Claud
 │       ├── Info.plist              # Bundle ID: com.anthropic.claude-code-notifier-banner
 │       ├── MacOS/terminal-notifier
 │       └── Resources/Claude.icns
-├── claude-icon-large.png           # 180x180 Claude logo (from claude.ai/apple-touch-icon.png)
+├── claude-icon-large.png           # Custom bell-with-sparkle icon (copied from repo icon.png)
 └── Claude.icns                     # macOS icon set generated from the PNG
+
+/Applications/
+└── ClaudeNotifications.app/        # Settings launcher (built by install.sh via osacompile)
 ```
 
 ## How it works
@@ -55,11 +57,12 @@ Clicking a notification activates the terminal and switches to the correct tab. 
 
 - **Two app bundles**: macOS locks notification style to the app bundle. To support per-event persistent vs banner, we build two variants of the notifier app with different bundle IDs and `NSUserNotificationAlertStyle` values.
 - **Legacy fallback**: If the selected variant app doesn't exist, `notify.sh` falls back to the legacy single `ClaudeNotifier.app` for backward compatibility.
-- **Custom app bundles**: macOS locks notification icon to the sending app. `-appIcon` flag doesn't work on modern macOS. Solution: copy `terminal-notifier.app`, change bundle ID/name/icon.
+- **Custom app bundles**: macOS locks notification icon to the sending app. `-appIcon` flag doesn't work on modern macOS. Solution: copy `terminal-notifier.app`, change bundle ID/name/icon. Uses a custom bell-with-sparkle icon (`icon.png` in repo). Binaries are re-signed with `codesign -s - --identifier <bundle-id>` so macOS treats them as distinct apps (not the original `terminal-notifier`). `notify.sh` also passes `-sender <bundle-id>` to reinforce the identity.
 - **Alert style**: Set via `NSUserNotificationAlertStyle` in Info.plist (`alert` for persistent, `banner` for banner). User must also configure in System Settings > Notifications.
 - **Terminal auto-detection**: `notify.sh` reads `$TERM_PROGRAM` to detect the terminal and captures a tab identifier (iTerm2 session ID, Terminal.app TTY). On click, `notify-click.sh` uses AppleScript to switch to the exact tab. Warp lacks AppleScript tab support, so only app-level activation is possible.
 - **`-execute` over `-activate`**: `terminal-notifier` flags are mutually exclusive. We use `-execute` to run `notify-click.sh` on click, which both activates the app and switches tabs. Falls back to no activation flag if terminal is unknown.
 - **Single python3 call**: All JSON parsing (stdin + config file) in one python3 invocation for performance.
+- **Invisible launcher**: `ClaudeNotifications.app` is installed to `/Applications/` (visible in Spotlight/Launchpad). It's a minimal AppleScript app built via `osacompile` at install time. It runs the Python server as a background process (`do shell script ... &`), so no Terminal window is shown — the browser simply opens.
 - **Settings UI**: Self-contained Python 3 script (`config-ui.py`) serves a browser-based UI on localhost. Zero external dependencies.
 - **Heartbeat auto-shutdown**: The browser sends `POST /api/heartbeat` every 3s. A watchdog daemon thread waits 30s (grace period for browser to open), then exits if no heartbeat for 10s. This means closing the browser tab auto-stops the server.
 
@@ -93,8 +96,8 @@ Clicking a notification activates the terminal and switches to the correct tab. 
 Launch the browser-based settings UI:
 
 ```bash
-# Double-click in Finder:
-open ~/.claude/Configure\ Notifications.command
+# Double-click in Finder / search in Spotlight / Launchpad:
+open /Applications/ClaudeNotifications.app
 
 # Or run directly:
 python3 ~/.claude/config-ui.py
@@ -130,12 +133,12 @@ Only the `hooks` section is relevant (the rest is user-specific):
 
 This single command handles everything:
 1. Installs `terminal-notifier` via Homebrew (if missing)
-2. Downloads Claude icon and converts to `.icns`
-3. Builds two `ClaudeNotifier*.app` bundles (Persistent + Banner) with Claude branding
+2. Copies custom icon from repo and converts to `.icns`
+3. Builds two `ClaudeNotifier*.app` bundles (Persistent + Banner) with custom icon
 4. Removes legacy `ClaudeNotifier.app` if present
 5. Sends test notifications to trigger macOS permission prompts
 6. Copies `notify.sh`, `notify-click.sh`, `notify-config.json`, and `config-ui.py` to `~/.claude/`
-7. Installs `Configure Notifications.command` launcher to `~/.claude/`
+7. Builds `ClaudeNotifications.app` launcher (invisible — no Terminal window) to `/Applications/`
 8. Automatically merges hooks into `~/.claude/settings.json` (creates if missing, preserves existing settings)
 
 The installer auto-configures alert styles (persistent vs banner) by writing to `com.apple.ncprefs.plist`. If auto-configuration fails (warnings shown during install), set manually:
@@ -154,7 +157,7 @@ Removes all notification components:
 1. Removes notification hooks from `~/.claude/settings.json` (preserves all other settings)
 2. Clears delivered notifications
 3. Unregisters app bundles from LaunchServices
-4. Deletes all installed files (notify.sh, notify-click.sh, config, UI, icon, apps, launcher)
+4. Deletes all installed files (notify.sh, notify-click.sh, config, UI, icon, apps) and launcher from `/Applications/`
 5. Removes entries from Notification Center database (`com.anthropic.claude-code-notifier*`) and restarts `usernoted` so they disappear from System Settings > Notifications
 
 Does NOT remove `terminal-notifier` Homebrew package or `~/.claude/` directory. Idempotent — safe to run multiple times.
@@ -180,12 +183,13 @@ python3 ~/.claude/config-ui.py
 | File | Purpose |
 |---|---|
 | `CLAUDE.md` | This file — project context |
+| `icon.png` | Custom bell-with-sparkle icon (2048x2048 JPEG, used for notifications and launcher) |
 | `notify.sh` | Main notification script (hook handler) |
 | `notify-click.sh` | Notification click handler — activates terminal + switches tab |
 | `notify-config.json` | User-editable config |
 | `config-ui.py` | Browser-based settings UI (with heartbeat auto-shutdown) |
-| `Configure Notifications.command` | Double-clickable launcher for config-ui.py |
-| `install.sh` | Setup script — builds notifier apps, downloads icon, installs to ~/.claude/ |
-| `uninstall.sh` | Removes all notification components from ~/.claude/ |
+| `ClaudeNotifications.app` | Settings launcher in `/Applications/` (built at install time via `osacompile`, not in repo) |
+| `install.sh` | Setup script — builds notifier apps, copies icon, installs to ~/.claude/ and /Applications/ |
+| `uninstall.sh` | Removes all notification components from ~/.claude/ and /Applications/ |
 | `ClaudeNotifierPersistent.plist` | Info.plist template for the persistent alert app |
 | `ClaudeNotifierBanner.plist` | Info.plist template for the banner alert app |

@@ -93,9 +93,11 @@ fi
 if [ "$STYLE" = "banner" ]; then
   NOTIFIER="$NOTIFIER_BANNER"
   GROUP="claude-code-banner"
+  SENDER="com.anthropic.claude-code-notifier-banner"
 else
   NOTIFIER="$NOTIFIER_PERSISTENT"
   GROUP="claude-code-persistent"
+  SENDER="com.anthropic.claude-code-notifier-persistent"
 fi
 
 # Fallback: try legacy ClaudeNotifier.app if selected variant doesn't exist
@@ -116,10 +118,12 @@ case "$TERM_APP" in
 esac
 
 # Send notification — clicking it activates the terminal and switches to the correct tab
+# -sender forces macOS to use our app's icon (same binary UUID as original terminal-notifier)
 if [ -n "$TERM_APP" ]; then
   "$NOTIFIER" \
     -title "$TITLE" \
     -message "$BODY" \
+    -sender "$SENDER" \
     -execute "bash $HOME/.claude/notify-click.sh '$TERM_APP' '$TAB_ID'" \
     -group "$GROUP" \
     2>/dev/null
@@ -128,6 +132,7 @@ else
   "$NOTIFIER" \
     -title "$TITLE" \
     -message "$BODY" \
+    -sender "$SENDER" \
     -group "$GROUP" \
     2>/dev/null
 fi

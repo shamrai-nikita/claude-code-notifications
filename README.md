@@ -5,7 +5,7 @@ Never miss when Claude Code needs your attention. Get native macOS notifications
 ## What you get
 
 - **Persistent or banner notifications** — choose per event type
-- **Claude icon** in the notification
+- **Custom notification icon** (bell with sparkle)
 - **Clicking the notification** opens your terminal (Warp)
 - **Configurable sounds and volume** per event type
 - **Browser-based settings UI** — no JSON editing required
@@ -34,8 +34,8 @@ Restart any running Claude Code sessions.
 ## Settings UI
 
 ```bash
-# Double-click in Finder:
-open ~/.claude/Configure\ Notifications.command
+# Double-click in Finder / search in Spotlight / Launchpad:
+open /Applications/ClaudeNotifications.app
 
 # Or run directly:
 python3 ~/.claude/config-ui.py
@@ -72,7 +72,7 @@ Edit `~/.claude/notify-config.json` directly, or use the settings UI above. Chan
 ./uninstall.sh
 ```
 
-Removes all notification hooks, app bundles, and installed files from `~/.claude/`. Does not remove the `terminal-notifier` Homebrew package.
+Removes all notification hooks, app bundles, installed files from `~/.claude/`, and the launcher from `/Applications/`. Does not remove the `terminal-notifier` Homebrew package.
 
 ## Requirements
 

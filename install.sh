@@ -27,24 +27,25 @@ if [ -z "$TN_APP" ]; then
 fi
 echo "Found terminal-notifier at: $TN_APP"
 
-# 2. Download Claude icon
-echo "Downloading Claude icon..."
-curl -sL "https://claude.ai/apple-touch-icon.png" -o "$CLAUDE_DIR/claude-icon-large.png"
-if ! file "$CLAUDE_DIR/claude-icon-large.png" | grep -q "PNG"; then
-  echo "WARNING: Could not download Claude icon. Notifications will use default icon."
-fi
+# 2. Copy icon from repo and convert to PNG (source may be JPEG despite .png extension)
+echo "Installing icon..."
+sips -s format png "$SCRIPT_DIR/icon.png" --out "$CLAUDE_DIR/claude-icon-large.png" > /dev/null
 
-# 3. Convert PNG to icns
+# 3. Convert to icns
 echo "Converting icon to icns..."
 ICONSET="$CLAUDE_DIR/claude.iconset"
 mkdir -p "$ICONSET"
 SRC="$CLAUDE_DIR/claude-icon-large.png"
-sips -z 16 16 "$SRC" --out "$ICONSET/icon_16x16.png" > /dev/null
-sips -z 32 32 "$SRC" --out "$ICONSET/icon_16x16@2x.png" > /dev/null
-sips -z 32 32 "$SRC" --out "$ICONSET/icon_32x32.png" > /dev/null
-sips -z 64 64 "$SRC" --out "$ICONSET/icon_32x32@2x.png" > /dev/null
-sips -z 128 128 "$SRC" --out "$ICONSET/icon_128x128.png" > /dev/null
-sips -z 180 180 "$SRC" --out "$ICONSET/icon_128x128@2x.png" > /dev/null
+sips -s format png -z 16 16 "$SRC" --out "$ICONSET/icon_16x16.png" > /dev/null
+sips -s format png -z 32 32 "$SRC" --out "$ICONSET/icon_16x16@2x.png" > /dev/null
+sips -s format png -z 32 32 "$SRC" --out "$ICONSET/icon_32x32.png" > /dev/null
+sips -s format png -z 64 64 "$SRC" --out "$ICONSET/icon_32x32@2x.png" > /dev/null
+sips -s format png -z 128 128 "$SRC" --out "$ICONSET/icon_128x128.png" > /dev/null
+sips -s format png -z 256 256 "$SRC" --out "$ICONSET/icon_128x128@2x.png" > /dev/null
+sips -s format png -z 256 256 "$SRC" --out "$ICONSET/icon_256x256.png" > /dev/null
+sips -s format png -z 512 512 "$SRC" --out "$ICONSET/icon_256x256@2x.png" > /dev/null
+sips -s format png -z 512 512 "$SRC" --out "$ICONSET/icon_512x512.png" > /dev/null
+sips -s format png -z 1024 1024 "$SRC" --out "$ICONSET/icon_512x512@2x.png" > /dev/null
 iconutil -c icns "$ICONSET" -o "$CLAUDE_DIR/Claude.icns"
 rm -rf "$ICONSET"
 echo "Icon created."
@@ -65,6 +66,9 @@ for variant in Persistent Banner; do
   cp -R "$TN_APP" "$CLAUDE_DIR/$APP_NAME"
   cp "$SCRIPT_DIR/ClaudeNotifier${variant}.plist" "$CLAUDE_DIR/$APP_NAME/Contents/Info.plist"
   cp "$CLAUDE_DIR/Claude.icns" "$CLAUDE_DIR/$APP_NAME/Contents/Resources/Claude.icns"
+  # Re-sign with our bundle ID so macOS treats it as a distinct app (not the original terminal-notifier)
+  BUNDLE_ID=$(defaults read "$CLAUDE_DIR/$APP_NAME/Contents/Info.plist" CFBundleIdentifier)
+  codesign --force -s - --identifier "$BUNDLE_ID" "$CLAUDE_DIR/$APP_NAME" 2>/dev/null || true
   touch "$CLAUDE_DIR/$APP_NAME"
   $LSREGISTER -f "$CLAUDE_DIR/$APP_NAME"
   echo "  $APP_NAME installed and registered."
@@ -156,17 +160,25 @@ fi
 echo "Installing config-ui.py..."
 cp "$SCRIPT_DIR/config-ui.py" "$CLAUDE_DIR/config-ui.py"
 
-# 8. Install clickable launcher
-echo "Installing Configure Notifications.command..."
-cat > "$CLAUDE_DIR/Configure Notifications.command" << 'LAUNCHER'
-#!/bin/bash
-echo "Starting Claude Code Notifications settings..."
-echo ""
-python3 ~/.claude/config-ui.py
-echo ""
-echo "Server stopped. You can close this window."
-LAUNCHER
-chmod +x "$CLAUDE_DIR/Configure Notifications.command"
+# 8. Build clickable launcher app (in /Applications/ for Spotlight/Launchpad)
+echo "Building ClaudeNotifications.app launcher..."
+LAUNCHER_APP="/Applications/ClaudeNotifications.app"
+rm -rf "$CLAUDE_DIR/ClaudeNotifications.app"  # remove old location
+rm -f "$CLAUDE_DIR/Configure Notifications.command"  # remove legacy
+rm -rf "$LAUNCHER_APP"
+osacompile -o "$LAUNCHER_APP" \
+  -e 'do shell script "python3 ~/.claude/config-ui.py &> /dev/null &"'
+cp "$CLAUDE_DIR/Claude.icns" "$LAUNCHER_APP/Contents/Resources/applet.icns"
+# Remove Assets.car — osacompile puts a default script icon in it that overrides applet.icns on modern macOS
+rm -f "$LAUNCHER_APP/Contents/Resources/Assets.car"
+$LSREGISTER -f "$LAUNCHER_APP"
+touch "$LAUNCHER_APP"
+
+# 8b. Flush icon caches so macOS picks up new icons
+echo "Flushing icon cache..."
+rm -rf ~/Library/Caches/com.apple.iconservices.store 2>/dev/null || true
+find /var/folders -name "com.apple.iconservicesagent" -type d -exec rm -rf {} + 2>/dev/null || true
+killall Dock 2>/dev/null || true
 
 # 9. Add hooks to settings.json
 echo "Configuring hooks in settings.json..."
@@ -214,7 +226,8 @@ echo "  1. System Settings > Notifications > ClaudeNotifications (Persistent) > 
 echo "  2. System Settings > Notifications > ClaudeNotifications (Vanishing) > leave as 'Banners'"
 echo ""
 echo "Configure settings:"
-echo "  Double-click: ~/.claude/Configure Notifications.command"
+echo "  Double-click: /Applications/ClaudeNotifications.app"
+echo "  Or search:    'ClaudeNotifications' in Spotlight / Launchpad"
 echo "  Or run:       python3 ~/.claude/config-ui.py"
 echo ""
 echo "Uninstall:"
