@@ -142,7 +142,7 @@ This single command handles everything:
 7. Builds `ClaudeNotifications.app` launcher (invisible — no Terminal window) to `/Applications/`
 8. Automatically merges hooks into `~/.claude/settings.json` (creates if missing, preserves existing settings)
 
-The installer auto-configures alert styles (persistent vs banner) by writing to `com.apple.ncprefs.plist`. If auto-configuration fails (warnings shown during install), set manually:
+The installer auto-configures alert styles (persistent vs banner) by writing to `com.apple.ncprefs.plist`. It polls for up to 15 seconds (every 2s) waiting for macOS to register both app bundle IDs after the test notifications. If an app still isn't registered after the timeout, the installer creates the ncprefs entry from scratch with the correct flags, so notifications work even on a fresh machine where macOS registration is slow. Flag bits used match real macOS entries (`REGISTERED = 1 << 13`, `SHOW_LOCK = 1 << 23`) rather than `SHOW_NC = 1 << 0` which doesn't appear in production entries. If auto-configuration fails (warnings shown during install), set manually:
 1. System Settings > Notifications > **ClaudeNotifications (Persistent)** > set Alert Style to **Alerts**
 2. System Settings > Notifications > **ClaudeNotifications (Vanishing)** > leave as **Banners**
 

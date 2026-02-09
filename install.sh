@@ -91,42 +91,86 @@ done
 # macOS ignores NSUserNotificationAlertStyle for unsigned apps, so we set it
 # directly in com.apple.ncprefs.plist (the Notification Center prefs store).
 echo "Configuring notification alert styles..."
-sleep 1  # allow ncprefs to register the new apps
 python3 -c "
-import subprocess, plistlib, sys
+import subprocess, plistlib, sys, time
 
-result = subprocess.run(['defaults', 'export', 'com.apple.ncprefs', '-'], capture_output=True)
-if result.returncode != 0:
-    print('  WARNING: Could not read notification preferences. Set alert styles manually.')
-    sys.exit(0)
+# --- Flag bits (matching real macOS ncprefs entries) ---
+BANNERS    = 1 << 3   # 8
+ALERTS     = 1 << 4   # 16
+BADGE      = 1 << 1   # 2
+SOUND      = 1 << 2   # 4
+REGISTERED = 1 << 13  # 8192
+SHOW_LOCK  = 1 << 23  # 8388608
+ALLOW      = 1 << 25  # 33554432
 
-pl = plistlib.loads(result.stdout)
-apps = pl.get('apps', [])
-
-BANNERS = 1 << 3       # 8
-ALERTS  = 1 << 4       # 16
-SHOW_NC = 1 << 0       # 1
-BADGE   = 1 << 1       # 2
-SOUND   = 1 << 2       # 4
-ALLOW   = 1 << 25      # 33554432
-
+# Persistent app gets Alerts style; Banner app gets Banners style
 targets = {
     'com.anthropic.claude-code-notifier-persistent': ALERTS,
     'com.anthropic.claude-code-notifier-banner': BANNERS,
 }
+
+app_paths = {
+    'com.anthropic.claude-code-notifier-persistent': '$CLAUDE_DIR/ClaudeNotifierPersistent.app',
+    'com.anthropic.claude-code-notifier-banner': '$CLAUDE_DIR/ClaudeNotifierBanner.app',
+}
+
+def read_plist():
+    result = subprocess.run(['defaults', 'export', 'com.apple.ncprefs', '-'], capture_output=True)
+    if result.returncode != 0:
+        return None
+    return plistlib.loads(result.stdout)
+
+def find_registered(pl):
+    found = set()
+    for app in pl.get('apps', []):
+        if app.get('bundle-id', '') in targets:
+            found.add(app['bundle-id'])
+    return found
+
+# --- Poll for up to 15 seconds waiting for macOS to register both apps ---
+pl = None
+found = set()
+for attempt in range(8):  # 0,1,...,7 → up to ~14s
+    pl = read_plist()
+    if pl is None:
+        print('  WARNING: Could not read notification preferences. Set alert styles manually.')
+        sys.exit(0)
+    found = find_registered(pl)
+    if found == set(targets.keys()):
+        break
+    time.sleep(2)
+
+# --- Configure existing entries + create missing ones ---
+apps = pl.get('apps', [])
 configured = []
 
+# Update entries that macOS already registered
 for app in apps:
     bid = app.get('bundle-id', '')
     if bid in targets:
         flags = app.get('flags', 0)
-        # Clear both style bits, then set the desired one
         flags &= ~(BANNERS | ALERTS)
         flags |= targets[bid]
-        flags |= ALLOW | SHOW_NC | BADGE | SOUND
+        flags |= ALLOW | REGISTERED | SHOW_LOCK | BADGE | SOUND
         app['flags'] = flags
-        app['grouping'] = 2  # Notification grouping: Off
-        configured.append(bid.split('-')[-1])  # 'persistent' or 'banner'
+        app['grouping'] = 2
+        configured.append(bid.split('-')[-1])
+
+# Create entries for apps that macOS never registered (fresh install edge case)
+for bid, style_bit in targets.items():
+    if bid not in found:
+        flags = style_bit | ALLOW | REGISTERED | SHOW_LOCK | BADGE | SOUND
+        entry = {
+            'bundle-id': bid,
+            'flags': flags,
+            'path': app_paths[bid],
+            'content_visibility': 0,
+            'grouping': 2,
+        }
+        apps.append(entry)
+        configured.append(bid.split('-')[-1])
+
+pl['apps'] = apps
 
 if configured:
     data = plistlib.dumps(pl, fmt=plistlib.FMT_BINARY)
@@ -138,9 +182,7 @@ if configured:
     else:
         print('  WARNING: Could not write notification preferences. Set alert styles manually.')
 else:
-    print('  WARNING: Apps not yet registered in Notification Center. Set alert styles manually:')
-    print('    System Settings > Notifications > ClaudeNotifications (Persistent) > Alerts')
-    print('    System Settings > Notifications > ClaudeNotifications (Vanishing) > Banners')
+    print('  WARNING: No notification entries to configure.')
 " || echo "  WARNING: Could not configure alert styles. Set manually in System Settings > Notifications."
 
 # 6. Copy notify.sh and config
