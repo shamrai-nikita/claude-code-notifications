@@ -78,18 +78,13 @@ echo "  $APP_NAME installed and registered."
 echo "Triggering notification permission (you may see a test notification)..."
 NOTIFIER="$CLAUDE_DIR/$APP_NAME/Contents/MacOS/terminal-notifier"
 "$NOTIFIER" -title "Claude Code Setup" -message "Notifications enabled" -group "claude-setup" 2>/dev/null || true
-# Brief pause then remove the test notification
-sleep 1
-"$NOTIFIER" -remove "claude-setup" 2>/dev/null || true
 
 # 5b. Set notification grouping to Off for the app bundle
-echo "Setting notification grouping to Off..."
+echo "Setting notification grouping to Off (may take up to 15s)..."
 python3 -c "
 import subprocess, plistlib, sys, time
 
-targets = [
-    'com.anthropic.claude-code-notifier',
-]
+TARGET = 'com.anthropic.claude-code-notifier'
 
 # Also clean up old bundle IDs from ncprefs
 old_ids = [
@@ -97,23 +92,31 @@ old_ids = [
     'com.anthropic.claude-code-notifier-banner',
 ]
 
+def kill_usernoted():
+    subprocess.run(['killall', 'usernoted'], capture_output=True)
+
 def read_plist():
     result = subprocess.run(['defaults', 'export', 'com.apple.ncprefs', '-'], capture_output=True)
     if result.returncode != 0:
         return None
     return plistlib.loads(result.stdout)
 
-# Poll for up to 15 seconds waiting for app to be registered
+# Step 1: Kill usernoted to flush in-memory app registration to disk
+kill_usernoted()
+time.sleep(1)
+
+# Step 2: Read ncprefs (app should now be on disk after flush)
 pl = None
-found = set()
-for attempt in range(8):
+found = False
+for attempt in range(3):
     pl = read_plist()
     if pl is None:
         break
     for app in pl.get('apps', []):
-        if app.get('bundle-id', '') in targets:
-            found.add(app['bundle-id'])
-    if found == set(targets):
+        if app.get('bundle-id', '') == TARGET:
+            found = True
+            break
+    if found:
         break
     time.sleep(2)
 
@@ -121,15 +124,23 @@ if pl is None:
     print('  WARNING: Could not read notification preferences.')
     sys.exit(0)
 
-# Set grouping = 2 (Off) for registered app, remove old entries
-changed = False
+# Step 3: If app not found after flush, insert a new entry as fallback
+if not found:
+    print('  App not in ncprefs after flush — inserting entry...')
+    pl.setdefault('apps', []).append({
+        'bundle-id': TARGET,
+        'grouping': 2,
+    })
+
+# Step 4: Set grouping = 2 (Off) for target app, remove old entries
+changed = not found  # already changed if we inserted
 apps_to_keep = []
 for app in pl.get('apps', []):
     bid = app.get('bundle-id', '')
     if bid in old_ids:
         changed = True
         continue  # Remove old entries
-    if bid in targets:
+    if bid == TARGET:
         if app.get('grouping') != 2:
             app['grouping'] = 2
             changed = True
@@ -138,17 +149,21 @@ for app in pl.get('apps', []):
 if changed:
     pl['apps'] = apps_to_keep
     data = plistlib.dumps(pl, fmt=plistlib.FMT_BINARY)
+    # Step 5: Kill usernoted BEFORE writing so it can't overwrite our changes
+    kill_usernoted()
+    time.sleep(0.5)
+    # Step 6: Write the modified plist — restarted usernoted reads our file
     wr = subprocess.run(['defaults', 'import', 'com.apple.ncprefs', '-'], input=data)
     if wr.returncode == 0:
-        subprocess.run(['killall', 'usernoted'], capture_output=True)
         print('  Notification grouping set to Off.')
     else:
         print('  WARNING: Could not write notification preferences.')
-elif found:
-    print('  Notification grouping already set.')
 else:
-    print('  WARNING: App not yet registered in Notification Center.')
+    print('  Notification grouping already set.')
 "
+
+# Remove the test notification (after grouping is set so it doesn't interfere with registration)
+"$NOTIFIER" -remove "claude-setup" 2>/dev/null || true
 
 # 6. Copy notify.sh and config
 echo "Installing notify.sh and config..."
