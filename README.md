@@ -2,14 +2,30 @@
 
 Native macOS notifications when Claude Code needs your attention or finishes a task. Configurable sounds and a browser-based settings UI.
 
-## What you get
+## Why use this
 
-- **Persistent or temporary notifications** — choose per event type
-- **Configurable sounds and volume** per event type, with per-event mute
-- **Auto-dismiss** — persistent notifications clear automatically when you take action
-- **Browser-based settings UI**
+**Works with any terminal** — clicking a notification activates your terminal
+
+**Customizable** — sound, volume, persistent vs temporary style, and enable/disable per event type.
+
+**Browser-based settings UI** — configure everything from a local web page.
+
+**Single-click install** — one script sets up everything.
+
+| Permission request | Question | Done |
+|---|---|---|
+| ![Permission request](images/notification-permission-bash.png) | ![Question](images/notification-question.png) | ![Done](images/notification-done.png) |
 
 ## Install
+
+Download the [latest release](https://github.com/shamrai-nikita/claude-code-notifications/releases/latest) or clone the repo:
+
+```bash
+git clone https://github.com/shamrai-nikita/claude-code-notifications.git
+cd claude-code-notifications
+```
+
+Then run:
 
 ```bash
 ./install.sh
@@ -17,22 +33,25 @@ Native macOS notifications when Claude Code needs your attention or finishes a t
 
 Restart any running Claude Code sessions.
 
-## Events
+## Settings UI
 
-| Event | Description | Default style |
-|---|---|---|
-| Permission request | Claude needs you to approve an action | Temporary |
-| Question | Claude is asking you something | Temporary |
-| Done | Claude finished responding | Temporary |
+Find **Claude Notifications** in your Applications folder (or Spotlight / Launchpad):
 
-## Settings
+<img src="images/app-icon.png" width="96" alt="Claude Notifications app icon">
+
+Or launch from the terminal:
 
 ```bash
 open /Applications/ClaudeNotifications.app
 # or: python3 ~/.claude/config-ui.py
 ```
 
-Toggle events, pick sounds, adjust volume, choose persistent vs temporary, and preview — all from the browser.
+<details>
+<summary>Settings UI preview</summary>
+
+<img src="images/settings-ui.png" width="400" alt="Settings UI">
+
+</details>
 
 ## Uninstall
 
