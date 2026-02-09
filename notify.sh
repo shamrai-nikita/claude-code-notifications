@@ -259,6 +259,21 @@ case "$TERM_APP" in
   WarpTerminal)   TAB_ID="" ;;
   iTerm.app)      TAB_ID="${ITERM_SESSION_ID:-}" ;;
   Apple_Terminal)  TAB_ID="/dev/$(ps -o tty= -p $PPID 2>/dev/null | xargs)" ;;
+  vscode)
+    # Cursor/VS Code: capture workspace name for window matching
+    TAB_ID="$(basename "${PWD:-}")"
+    # Detect actual app by walking process tree to find .app bundle
+    _pid=$PPID
+    while [ "$_pid" -gt 1 ] 2>/dev/null; do
+      _args=$(ps -o args= -p $_pid 2>/dev/null)
+      case "$_args" in
+        */Cursor.app/*)                TERM_APP="Cursor"; break ;;
+        */"Visual Studio Code"*.app/*) TERM_APP="Visual Studio Code"; break ;;
+        */VSCodium.app/*)              TERM_APP="VSCodium"; break ;;
+      esac
+      _pid=$(ps -o ppid= -p $_pid 2>/dev/null | tr -d ' ')
+    done
+    ;;
   *)              TAB_ID="" ;;
 esac
 
