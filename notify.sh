@@ -1,13 +1,12 @@
 #!/bin/bash
 # Claude Code notification handler
-# Uses custom ClaudeNotifier apps for branded notifications
-# Persistent and Banner variants for per-event alert style
+# Uses a single ClaudeNotifications app bundle (alert style) for branded notifications
+# "Temporary" style is simulated via background dismiss timer (sleep + -remove)
 # Clicking the notification activates the terminal and switches to the correct tab
 # Config: ~/.claude/notify-config.json
 
-NOTIFIER_PERSISTENT="$HOME/.claude/ClaudeNotifications Alerts.app/Contents/MacOS/terminal-notifier"
-NOTIFIER_BANNER="$HOME/.claude/ClaudeNotifications Banners.app/Contents/MacOS/terminal-notifier"
-NOTIFIER_LEGACY="$HOME/.claude/ClaudeNotifier.app/Contents/MacOS/terminal-notifier"
+NOTIFIER="$HOME/.claude/ClaudeNotifications.app/Contents/MacOS/terminal-notifier"
+SENDER="com.anthropic.claude-code-notifier"
 CONFIG="$HOME/.claude/notify-config.json"
 
 # --- Trash-based uninstall cleanup ---
@@ -62,8 +61,8 @@ if changed:
   fi
 
   # 2. Clear delivered notifications
-  for group in claude-code-persistent claude-code-banner claude-code; do
-    for app_name in "ClaudeNotifications Alerts" "ClaudeNotifications Banners" ClaudeNotifierPersistent ClaudeNotifierBanner ClaudeNotifier; do
+  for group in claude-code claude-code-persistent claude-code-banner; do
+    for app_name in ClaudeNotifications "ClaudeNotifications Alerts" "ClaudeNotifications Banners" ClaudeNotifierPersistent ClaudeNotifierBanner ClaudeNotifier; do
       local notifier="$CLAUDE_DIR/${app_name}.app/Contents/MacOS/terminal-notifier"
       if [ -x "$notifier" ]; then
         "$notifier" -remove "$group" 2>/dev/null || true
@@ -71,14 +70,21 @@ if changed:
     done
   done
 
-  # 3. Unregister app bundles from LaunchServices
-  for dir in "$CLAUDE_DIR/ClaudeNotifications Alerts.app" "$CLAUDE_DIR/ClaudeNotifications Banners.app" "$CLAUDE_DIR/ClaudeNotifierPersistent.app" "$CLAUDE_DIR/ClaudeNotifierBanner.app" "$CLAUDE_DIR/ClaudeNotifier.app"; do
+  # 3. Kill background dismiss timer processes
+  if [ -d "$CLAUDE_DIR/.persistent-notifications" ]; then
+    for dpid_file in "$CLAUDE_DIR/.persistent-notifications"/*.dpid; do
+      [ -f "$dpid_file" ] && kill "$(cat "$dpid_file")" 2>/dev/null || true
+    done
+  fi
+
+  # 4. Unregister app bundles from LaunchServices
+  for dir in "$CLAUDE_DIR/ClaudeNotifications.app" "$CLAUDE_DIR/ClaudeNotifications Alerts.app" "$CLAUDE_DIR/ClaudeNotifications Banners.app" "$CLAUDE_DIR/ClaudeNotifierPersistent.app" "$CLAUDE_DIR/ClaudeNotifierBanner.app" "$CLAUDE_DIR/ClaudeNotifier.app"; do
     if [ -d "$dir" ]; then
       "$LSREGISTER" -u "$dir" 2>/dev/null || true
     fi
   done
 
-  # 4. Delete notification files
+  # 5. Delete notification files
   rm -f "$CLAUDE_DIR/notify-click.sh" 2>/dev/null
   rm -f "$CLAUDE_DIR/notify-config.json" 2>/dev/null
   rm -f "$CLAUDE_DIR/config-ui.py" 2>/dev/null
@@ -88,14 +94,15 @@ if changed:
   rm -f "$CLAUDE_DIR/.notify-installed" 2>/dev/null
   rm -rf "$CLAUDE_DIR/.persistent-notifications" 2>/dev/null
 
-  # 5. Delete app bundles (new + old names for backward compat)
+  # 6. Delete app bundles (new + old names for backward compat)
+  rm -rf "$CLAUDE_DIR/ClaudeNotifications.app" 2>/dev/null
   rm -rf "$CLAUDE_DIR/ClaudeNotifications Alerts.app" 2>/dev/null
   rm -rf "$CLAUDE_DIR/ClaudeNotifications Banners.app" 2>/dev/null
   rm -rf "$CLAUDE_DIR/ClaudeNotifierPersistent.app" 2>/dev/null
   rm -rf "$CLAUDE_DIR/ClaudeNotifierBanner.app" 2>/dev/null
   rm -rf "$CLAUDE_DIR/ClaudeNotifier.app" 2>/dev/null
 
-  # 6. Clean Notification Center database entries
+  # 7. Clean Notification Center database entries
   local NCDB="$HOME/Library/Group Containers/group.com.apple.usernoted/db2/db"
   if [ -f "$NCDB" ]; then
     local nc_count
@@ -108,7 +115,7 @@ if changed:
     fi
   fi
 
-  # 7. Delete notify.sh itself — safe because bash holds the fd open
+  # 8. Delete notify.sh itself — safe because bash holds the fd open
   rm -f "$CLAUDE_DIR/notify.sh" 2>/dev/null
 }
 
@@ -120,7 +127,7 @@ if [ ! -d "/Applications/ClaudeNotifications.app" ] && [ -f "$HOME/.claude/.noti
   exit 0
 fi
 
-# --- Auto-dismiss: resolve stale persistent notifications ---
+# --- Auto-dismiss: resolve stale notifications ---
 # PostToolUse = permission was granted and tool ran. UserPromptSubmit = user responded.
 MARKER_DIR="$HOME/.claude/.persistent-notifications"
 # Stable process ID: grandparent PID persists across context clears within the same
@@ -135,25 +142,40 @@ if [[ "$INPUT" == *'"PostToolUse"'* ]] || [[ "$INPUT" == *'"UserPromptSubmit"'* 
       if [ -f "$MARKER_DIR/$SID" ]; then
         DISMISS_GROUP=$(cat "$MARKER_DIR/$SID")
         rm -f "$MARKER_DIR/$SID"
+        # Kill background dismiss timer if running
+        if [ -f "$MARKER_DIR/$SID.dpid" ]; then
+          kill "$(cat "$MARKER_DIR/$SID.dpid")" 2>/dev/null || true
+          rm -f "$MARKER_DIR/$SID.dpid"
+        fi
       fi
     fi
     # Fallback: try stable process ID (handles context-clear case where session_id changed)
     if [ -z "$DISMISS_GROUP" ] && [ -n "$STABLE_PID" ] && [ -f "$MARKER_DIR/pid-$STABLE_PID" ]; then
       DISMISS_GROUP=$(cat "$MARKER_DIR/pid-$STABLE_PID")
+      # Kill background dismiss timer if running
+      if [ -f "$MARKER_DIR/pid-$STABLE_PID.dpid" ]; then
+        kill "$(cat "$MARKER_DIR/pid-$STABLE_PID.dpid")" 2>/dev/null || true
+        rm -f "$MARKER_DIR/pid-$STABLE_PID.dpid"
+      fi
     fi
     # Always clean up the pid marker for this instance
     [ -n "$STABLE_PID" ] && rm -f "$MARKER_DIR/pid-$STABLE_PID"
     # Dismiss the notification
     if [ -n "$DISMISS_GROUP" ]; then
-      [ -x "$NOTIFIER_PERSISTENT" ] && "$NOTIFIER_PERSISTENT" -remove "$DISMISS_GROUP" 2>/dev/null
-      [ -x "$NOTIFIER_LEGACY" ] && "$NOTIFIER_LEGACY" -remove "claude-code" 2>/dev/null
+      [ -x "$NOTIFIER" ] && "$NOTIFIER" -remove "$DISMISS_GROUP" 2>/dev/null
+      # Legacy fallback
+      for legacy in "$HOME/.claude/ClaudeNotifications Alerts.app/Contents/MacOS/terminal-notifier" \
+                     "$HOME/.claude/ClaudeNotifierPersistent.app/Contents/MacOS/terminal-notifier" \
+                     "$HOME/.claude/ClaudeNotifier.app/Contents/MacOS/terminal-notifier"; do
+        [ -x "$legacy" ] && "$legacy" -remove "claude-code" 2>/dev/null
+      done
     fi
   fi
   exit 0
 fi
 
 # Parse hook event data and read config in a single python3 call
-# Outputs: EVENT_KEY ENABLED SOUND VOLUME STYLE SOUND_ENABLED TITLE BODY SESSION_ID
+# Outputs: EVENT_KEY ENABLED SOUND VOLUME STYLE SOUND_ENABLED TIMEOUT TITLE BODY SESSION_ID
 eval $(CLAUDE_HOOK_INPUT="$INPUT" python3 -c "
 import sys, json, os
 
@@ -201,7 +223,7 @@ else:
 # Check global kill switch
 if not config.get('global_enabled', True):
     enabled = False
-    sound = 'Funk'; volume = 7; style = 'banner'; sound_enabled = True
+    sound = 'Funk'; volume = 7; style = 'banner'; sound_enabled = True; timeout = 5
 else:
     # Get per-event config
     evt = events_config.get(event_key, {})
@@ -210,6 +232,7 @@ else:
     volume = evt.get('volume', 7)
     style = evt.get('style', 'banner')
     sound_enabled = evt.get('sound_enabled', True)
+    timeout = evt.get('timeout', config.get('default_timeout', 5))
 
 # Escape single quotes for shell
 title = title.replace(\"'\", \"'\\\\''\")
@@ -221,6 +244,7 @@ print(f\"SOUND='{sound}'\")
 print(f\"VOLUME={volume}\")
 print(f\"STYLE='{style}'\")
 print(f\"SOUND_ENABLED={'1' if sound_enabled else '0'}\")
+print(f\"TIMEOUT={timeout}\")
 print(f\"TITLE='{title}'\")
 print(f\"BODY='{body}'\")
 print(f\"SESSION_ID='{session_id}'\")
@@ -231,28 +255,22 @@ if [ "$ENABLED" = "0" ]; then
   exit 0
 fi
 
-# Select notifier app and group based on style
-if [ "$STYLE" = "banner" ]; then
-  NOTIFIER="$NOTIFIER_BANNER"
-  GROUP="claude-code-banner"
-  SENDER="com.anthropic.claude-code-notifier-banner"
-else
-  NOTIFIER="$NOTIFIER_PERSISTENT"
-  GROUP="claude-code-persistent"
-  SENDER="com.anthropic.claude-code-notifier-persistent"
-fi
-
-# Per-session group for independent multi-session notifications
+# Single notifier app — group is per-session
+GROUP="claude-code"
 if [ -n "$SESSION_ID" ]; then
   GROUP="${GROUP}-${SESSION_ID}"
 fi
 
-# Fallback: try legacy ClaudeNotifier.app if selected variant doesn't exist
+# Fallback: try legacy app bundles if new single app doesn't exist
 if [ ! -x "$NOTIFIER" ]; then
-  if [ -x "$NOTIFIER_LEGACY" ]; then
-    NOTIFIER="$NOTIFIER_LEGACY"
-    GROUP="claude-code"
-  fi
+  for fallback in "$HOME/.claude/ClaudeNotifications Alerts.app/Contents/MacOS/terminal-notifier" \
+                   "$HOME/.claude/ClaudeNotifierPersistent.app/Contents/MacOS/terminal-notifier" \
+                   "$HOME/.claude/ClaudeNotifier.app/Contents/MacOS/terminal-notifier"; do
+    if [ -x "$fallback" ]; then
+      NOTIFIER="$fallback"
+      break
+    fi
+  done
 fi
 
 # Auto-detect terminal and tab identifier from environment
@@ -279,13 +297,21 @@ case "$TERM_APP" in
   *)              TAB_ID="" ;;
 esac
 
-# Dismiss this session's previous persistent notification (if any)
+# Dismiss this session's previous notification (if any)
 if [ -n "$SESSION_ID" ] && [ -f "$MARKER_DIR/$SESSION_ID" ]; then
   OLD_GROUP=$(cat "$MARKER_DIR/$SESSION_ID")
   rm -f "$MARKER_DIR/$SESSION_ID"
   [ -n "$STABLE_PID" ] && rm -f "$MARKER_DIR/pid-$STABLE_PID"
-  [ -x "$NOTIFIER_PERSISTENT" ] && "$NOTIFIER_PERSISTENT" -remove "$OLD_GROUP" 2>/dev/null
-  [ -x "$NOTIFIER_LEGACY" ] && "$NOTIFIER_LEGACY" -remove "claude-code" 2>/dev/null
+  # Kill old background dismiss timer
+  if [ -f "$MARKER_DIR/$SESSION_ID.dpid" ]; then
+    kill "$(cat "$MARKER_DIR/$SESSION_ID.dpid")" 2>/dev/null || true
+    rm -f "$MARKER_DIR/$SESSION_ID.dpid"
+  fi
+  if [ -n "$STABLE_PID" ] && [ -f "$MARKER_DIR/pid-$STABLE_PID.dpid" ]; then
+    kill "$(cat "$MARKER_DIR/pid-$STABLE_PID.dpid")" 2>/dev/null || true
+    rm -f "$MARKER_DIR/pid-$STABLE_PID.dpid"
+  fi
+  [ -x "$NOTIFIER" ] && "$NOTIFIER" -remove "$OLD_GROUP" 2>/dev/null
 fi
 
 # Send notification — clicking it activates the terminal and switches to the correct tab
@@ -308,11 +334,26 @@ else
     2>/dev/null
 fi
 
-# Track active persistent notification for auto-dismiss
-if [ "$STYLE" != "banner" ] && [ -n "$SESSION_ID" ]; then
+# Track active notification for auto-dismiss (all styles, not just persistent)
+if [ -n "$SESSION_ID" ]; then
   mkdir -p "$MARKER_DIR"
   echo "$GROUP" > "$MARKER_DIR/$SESSION_ID"
   [ -n "$STABLE_PID" ] && echo "$GROUP" > "$MARKER_DIR/pid-$STABLE_PID"
+fi
+
+# For temporary (banner) style: spawn background dismiss timer
+if [ "$STYLE" = "banner" ] && [ -n "$SESSION_ID" ]; then
+  (
+    sleep "$TIMEOUT"
+    "$NOTIFIER" -remove "$GROUP" 2>/dev/null
+    rm -f "$MARKER_DIR/$SESSION_ID" 2>/dev/null
+    rm -f "$MARKER_DIR/$SESSION_ID.dpid" 2>/dev/null
+    [ -n "$STABLE_PID" ] && rm -f "$MARKER_DIR/pid-$STABLE_PID" 2>/dev/null
+    [ -n "$STABLE_PID" ] && rm -f "$MARKER_DIR/pid-$STABLE_PID.dpid" 2>/dev/null
+  ) &
+  DISMISS_PID=$!
+  echo "$DISMISS_PID" > "$MARKER_DIR/$SESSION_ID.dpid"
+  [ -n "$STABLE_PID" ] && echo "$DISMISS_PID" > "$MARKER_DIR/pid-$STABLE_PID.dpid"
 fi
 
 # Play alert sound at configured volume (if sound is enabled)

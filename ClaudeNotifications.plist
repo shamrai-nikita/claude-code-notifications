@@ -11,13 +11,13 @@
 	<key>CFBundleIconFile</key>
 	<string>Claude</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.anthropic.claude-code-notifier-banner</string>
+	<string>com.anthropic.claude-code-notifier</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleDisplayName</key>
-	<string>ClaudeNotifications Banners</string>
+	<string>ClaudeNotifications</string>
 	<key>CFBundleName</key>
-	<string>ClaudeNotifications Banners</string>
+	<string>ClaudeNotifications</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -56,12 +56,12 @@
 		<true/>
 	</dict>
 	<key>NSHumanReadableCopyright</key>
-	<string>Copyright © 2012-2017 Eloy Durán, Julien Blanchard. All rights reserved.</string>
+	<string>Copyright &#169; 2012-2017 Eloy Dur&#225;n, Julien Blanchard. All rights reserved.</string>
 	<key>NSMainNibFile</key>
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 	<key>NSUserNotificationAlertStyle</key>
-	<string>banner</string>
+	<string>alert</string>
 </dict>
 </plist>

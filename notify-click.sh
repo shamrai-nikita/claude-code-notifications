@@ -11,8 +11,16 @@ TERM_APP="${1:-}"
 TAB_ID="${2:-}"
 SESSION_ID="${3:-}"
 
-# Clear persistent notification marker (user clicked the notification directly)
-[ -n "$SESSION_ID" ] && rm -f "$HOME/.claude/.persistent-notifications/$SESSION_ID" 2>/dev/null
+# Clear notification marker (user clicked the notification directly)
+if [ -n "$SESSION_ID" ]; then
+  rm -f "$HOME/.claude/.persistent-notifications/$SESSION_ID" 2>/dev/null
+  # Kill background dismiss timer if running
+  DPID_FILE="$HOME/.claude/.persistent-notifications/$SESSION_ID.dpid"
+  if [ -f "$DPID_FILE" ]; then
+    kill "$(cat "$DPID_FILE")" 2>/dev/null || true
+    rm -f "$DPID_FILE"
+  fi
+fi
 
 case "$TERM_APP" in
   iTerm.app)

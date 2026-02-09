@@ -50,6 +50,7 @@ EVENT_ORDER = ["permission_request", "elicitation_dialog", "stop"]
 
 DEFAULT_CONFIG = {
     "global_enabled": True,
+    "default_timeout": 5,
     "events": {
         "permission_request": {"enabled": True, "sound": "Funk", "volume": 7, "style": "banner", "sound_enabled": True},
         "elicitation_dialog": {"enabled": True, "sound": "Glass", "volume": 7, "style": "banner", "sound_enabled": True},
@@ -423,6 +424,44 @@ HTML_PAGE = r"""<!DOCTYPE html>
   .info-icon:hover .info-tooltip { opacity: 1; pointer-events: auto; transform: translateX(-50%) translateY(2px); }
   .sound-controls-dim { opacity: 0.35; }
 
+  /* Timeout input */
+  .timeout-group {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    transition: opacity 0.15s ease;
+  }
+  .timeout-group.hidden { display: none; }
+  .timeout-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+  }
+  input[type=number] {
+    height: 28px;
+    width: 56px;
+    border: 1px solid var(--color-border);
+    border-radius: 0.375rem;
+    padding: 0 0.375rem;
+    font-family: inherit;
+    font-size: 0.8125rem;
+    background: var(--color-input-bg);
+    color: var(--color-text);
+    text-align: center;
+    -moz-appearance: textfield;
+  }
+  input[type=number]::-webkit-outer-spin-button,
+  input[type=number]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type=number]:focus { outline: 2px solid var(--color-accent); outline-offset: -1px; }
+  .timeout-unit {
+    font-size: 0.75rem;
+    color: var(--color-text-tertiary);
+  }
+
   /* Preview button */
   .btn-preview {
     display: inline-flex;
@@ -599,6 +638,7 @@ function getEventVal(key, field) {
   if (field === 'volume') return evt.volume !== undefined ? evt.volume : 7;
   if (field === 'style') return evt.style || 'persistent';
   if (field === 'sound_enabled') return evt.sound_enabled !== undefined ? evt.sound_enabled : true;
+  if (field === 'timeout') return evt.timeout !== undefined ? evt.timeout : (config.default_timeout !== undefined ? config.default_timeout : 5);
   return undefined;
 }
 
@@ -639,7 +679,9 @@ function render() {
     const volume = getEventVal(key, 'volume');
     const style = getEventVal(key, 'style');
     const soundOn = getEventVal(key, 'sound_enabled');
+    const timeout = getEventVal(key, 'timeout');
     const soundCtrlOff = !enabled || !soundOn;
+    const isBanner = style === 'banner';
 
     html += `<div class="event-section ${enabled?'':'disabled'}" id="evt-${key}">
       <div class="event-header">
@@ -665,24 +707,32 @@ function render() {
           <div class="style-info-wrap">
             <div class="seg-control" id="style-${key}">
               <label class="${style==='persistent'?'active':''}"
-                onclick="if(!this.closest('.event-section').classList.contains('disabled')){setRadio('style-${key}','persistent');setEventVal('${key}','style','persistent')}">
+                onclick="if(!this.closest('.event-section').classList.contains('disabled')){setRadio('style-${key}','persistent');setEventVal('${key}','style','persistent');render()}">
                 <input type="radio" name="style-${key}" value="persistent" ${style==='persistent'?'checked':''} ${enabled?'':'disabled'}><span>Persistent</span>
               </label>
               <label class="${style==='banner'?'active':''}"
-                onclick="if(!this.closest('.event-section').classList.contains('disabled')){setRadio('style-${key}','banner');setEventVal('${key}','style','banner')}">
+                onclick="if(!this.closest('.event-section').classList.contains('disabled')){setRadio('style-${key}','banner');setEventVal('${key}','style','banner');render()}">
                 <input type="radio" name="style-${key}" value="banner" ${style==='banner'?'checked':''} ${enabled?'':'disabled'}><span>Temporary</span>
               </label>
             </div>
-            <span class="info-icon">i<span class="info-tooltip"><strong>Persistent</strong> stays on screen until resolved or dismissed.<br><strong>Temporary</strong> auto-dismisses after a few seconds.</span></span>
+            <span class="info-icon">i<span class="info-tooltip"><strong>Persistent</strong> stays on screen until resolved or dismissed.<br><strong>Temporary</strong> auto-dismisses after the configured timeout.</span></span>
           </div>
         </div>
         <div class="controls-row-secondary">
-          <div class="sound-toggle-group">
-            <span class="speaker-icon">${soundOn ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>' : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>'}</span>
-            <label class="toggle">
-              <input type="checkbox" ${soundOn?'checked':''} ${enabled?'':'disabled'} onchange="setEventVal('${key}','sound_enabled',this.checked);render()">
-              <span class="slider"></span>
-            </label>
+          <div style="display:flex;align-items:center;gap:0.75rem;">
+            <div class="sound-toggle-group">
+              <span class="speaker-icon">${soundOn ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>' : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>'}</span>
+              <label class="toggle">
+                <input type="checkbox" ${soundOn?'checked':''} ${enabled?'':'disabled'} onchange="setEventVal('${key}','sound_enabled',this.checked);render()">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="timeout-group ${isBanner?'':'hidden'}" id="timeout-${key}">
+              <span class="timeout-label">Dismiss after</span>
+              <input type="number" min="1" max="60" value="${timeout}" ${enabled?'':'disabled'}
+                onchange="setEventVal('${key}','timeout',Math.max(1,Math.min(60,+this.value||5)))">
+              <span class="timeout-unit">s</span>
+            </div>
           </div>
           <button class="btn-preview" onclick="previewEvt(this,'${key}')" ${enabled?'':'disabled'}><span class="play-icon">&#9654;</span> Preview</button>
         </div>
@@ -726,12 +776,12 @@ function toggleEvent(key, checked) {
 function getEvtSound(key) { return getEventVal(key, 'sound'); }
 function getEvtVol(key) { return getEventVal(key, 'volume'); }
 
-async function preview(sound, volume, style, eventKey, soundEnabled) {
+async function preview(sound, volume, style, eventKey, soundEnabled, timeout) {
   const se = soundEnabled !== undefined ? soundEnabled : true;
   await fetch('/api/preview', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({sound, volume, style, event_key: eventKey || null, sound_enabled: se}),
+    body: JSON.stringify({sound, volume, style, event_key: eventKey || null, sound_enabled: se, timeout: timeout || 5}),
   });
 }
 
@@ -740,7 +790,7 @@ async function previewEvt(btn, key) {
   btn.innerHTML = '<span class="play-icon">&#8987;</span> ...';
   btn.disabled = true;
   try {
-    await preview(getEvtSound(key), getEvtVol(key), getEventVal(key,'style'), key, getEventVal(key,'sound_enabled'));
+    await preview(getEvtSound(key), getEvtVol(key), getEventVal(key,'style'), key, getEventVal(key,'sound_enabled'), getEventVal(key,'timeout'));
   } finally {
     setTimeout(() => { btn.innerHTML = origText; btn.disabled = false; }, 400);
   }
@@ -789,15 +839,13 @@ setInterval(() => fetch('/api/heartbeat', {method: 'POST'}).catch(() => {}), 300
 </html>"""
 
 
-NOTIFIER_PERSISTENT = os.path.expanduser(
-    "~/.claude/ClaudeNotifications Alerts.app/Contents/MacOS/terminal-notifier"
-)
-NOTIFIER_BANNER = os.path.expanduser(
-    "~/.claude/ClaudeNotifications Banners.app/Contents/MacOS/terminal-notifier"
+NOTIFIER = os.path.expanduser(
+    "~/.claude/ClaudeNotifications.app/Contents/MacOS/terminal-notifier"
 )
 NOTIFIER_LEGACY = os.path.expanduser(
     "~/.claude/ClaudeNotifier.app/Contents/MacOS/terminal-notifier"
 )
+SENDER = "com.anthropic.claude-code-notifier"
 
 def _detect_terminal_bundle():
     term = os.environ.get("TERM_PROGRAM", "")
@@ -822,26 +870,38 @@ PREVIEW_BODIES = {
     "stop": "Finished responding (preview)",
 }
 
+# Track preview dismiss timer so we can cancel it on new preview
+_preview_dismiss_timer = None
+_preview_timer_lock = threading.Lock()
 
-def _send_preview_notification(style, event_key=None):
-    """Send a preview macOS notification using the appropriate notifier app."""
-    if style == "banner":
-        notifier = NOTIFIER_BANNER
-        group = "claude-code-banner"
-    else:
-        notifier = NOTIFIER_PERSISTENT
-        group = "claude-code-persistent"
 
-    # Fallback to legacy app
+def _send_preview_notification(style, event_key=None, timeout=5):
+    """Send a preview macOS notification using the single notifier app."""
+    global _preview_dismiss_timer
+
+    notifier = NOTIFIER
+    group = "claude-code-preview"
+
+    # Fallback to legacy apps
     if not os.path.isfile(notifier):
-        if os.path.isfile(NOTIFIER_LEGACY):
-            notifier = NOTIFIER_LEGACY
-            group = "claude-code"
+        for fallback in [
+            os.path.expanduser("~/.claude/ClaudeNotifications Alerts.app/Contents/MacOS/terminal-notifier"),
+            NOTIFIER_LEGACY,
+        ]:
+            if os.path.isfile(fallback):
+                notifier = fallback
+                break
         else:
             return  # No notifier available
 
     title = PREVIEW_TITLES.get(event_key, "Claude Code")
     body = PREVIEW_BODIES.get(event_key, "Preview notification")
+
+    # Cancel previous dismiss timer
+    with _preview_timer_lock:
+        if _preview_dismiss_timer is not None:
+            _preview_dismiss_timer.cancel()
+            _preview_dismiss_timer = None
 
     subprocess.Popen(
         [
@@ -854,6 +914,20 @@ def _send_preview_notification(style, event_key=None):
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
+
+    # For temporary style, dismiss after timeout
+    if style == "banner":
+        def dismiss():
+            subprocess.Popen(
+                [notifier, "-remove", group],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        t = threading.Timer(timeout, dismiss)
+        t.daemon = True
+        t.start()
+        with _preview_timer_lock:
+            _preview_dismiss_timer = t
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -941,6 +1015,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 volume = data.get("volume", 7)
                 style = data.get("style", "persistent")
                 event_key = data.get("event_key")
+                timeout = data.get("timeout", 5)
 
                 # Validate sound name against allowlist
                 if sound not in VALID_SOUNDS:
@@ -958,10 +1033,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 if style not in ("persistent", "banner"):
                     style = "persistent"
 
+                # Validate timeout
+                try:
+                    timeout = int(timeout)
+                    timeout = max(1, min(60, timeout))
+                except (ValueError, TypeError):
+                    timeout = 5
+
                 sound_enabled = data.get("sound_enabled", True)
 
-                # Send macOS notification via the appropriate notifier app
-                _send_preview_notification(style, event_key)
+                # Send macOS notification via the notifier app
+                _send_preview_notification(style, event_key, timeout)
 
                 # Play alert sound (if sound is enabled)
                 if sound_enabled:

@@ -50,53 +50,49 @@ iconutil -c icns "$ICONSET" -o "$CLAUDE_DIR/Claude.icns"
 rm -rf "$ICONSET"
 echo "Icon created."
 
-# 4. Build ClaudeNotifier app bundles (Alerts + Banners)
-echo "Building ClaudeNotifier app bundles..."
+# 4. Build single ClaudeNotifications.app bundle (alert style)
+echo "Building ClaudeNotifications.app..."
 
-# Remove legacy app bundles if present
-for legacy in "ClaudeNotifier.app" "ClaudeNotifierPersistent.app" "ClaudeNotifierBanner.app"; do
+# Remove all legacy app bundles
+for legacy in "ClaudeNotifier.app" "ClaudeNotifierPersistent.app" "ClaudeNotifierBanner.app" "ClaudeNotifications Alerts.app" "ClaudeNotifications Banners.app"; do
   if [ -d "$CLAUDE_DIR/$legacy" ]; then
-    echo "Removing legacy $legacy..."
+    echo "  Removing legacy $legacy..."
+    "$LSREGISTER" -u "$CLAUDE_DIR/$legacy" 2>/dev/null || true
     rm -rf "$CLAUDE_DIR/$legacy"
   fi
 done
 
-for variant in Alerts Banners; do
-  APP_DIR="ClaudeNotifications ${variant}"
-  APP_NAME="${APP_DIR}.app"
-  PLIST_SRC="ClaudeNotifier$([ "$variant" = "Alerts" ] && echo Persistent || echo Banner).plist"
-  echo "  Building $APP_NAME..."
-  rm -rf "$CLAUDE_DIR/$APP_NAME"
-  cp -R "$TN_APP" "$CLAUDE_DIR/$APP_NAME"
-  cp "$SCRIPT_DIR/$PLIST_SRC" "$CLAUDE_DIR/$APP_NAME/Contents/Info.plist"
-  cp "$CLAUDE_DIR/Claude.icns" "$CLAUDE_DIR/$APP_NAME/Contents/Resources/Claude.icns"
-  # Re-sign with our bundle ID so macOS treats it as a distinct app (not the original terminal-notifier)
-  BUNDLE_ID=$(defaults read "$CLAUDE_DIR/$APP_NAME/Contents/Info.plist" CFBundleIdentifier)
-  codesign --force -s - --identifier "$BUNDLE_ID" "$CLAUDE_DIR/$APP_NAME" 2>/dev/null || true
-  touch "$CLAUDE_DIR/$APP_NAME"
-  $LSREGISTER -f "$CLAUDE_DIR/$APP_NAME"
-  echo "  $APP_NAME installed and registered."
-done
+APP_NAME="ClaudeNotifications.app"
+rm -rf "$CLAUDE_DIR/$APP_NAME"
+cp -R "$TN_APP" "$CLAUDE_DIR/$APP_NAME"
+cp "$SCRIPT_DIR/ClaudeNotifications.plist" "$CLAUDE_DIR/$APP_NAME/Contents/Info.plist"
+cp "$CLAUDE_DIR/Claude.icns" "$CLAUDE_DIR/$APP_NAME/Contents/Resources/Claude.icns"
+# Re-sign with our bundle ID so macOS treats it as a distinct app (not the original terminal-notifier)
+BUNDLE_ID=$(defaults read "$CLAUDE_DIR/$APP_NAME/Contents/Info.plist" CFBundleIdentifier)
+codesign --force -s - --identifier "$BUNDLE_ID" "$CLAUDE_DIR/$APP_NAME" 2>/dev/null || true
+touch "$CLAUDE_DIR/$APP_NAME"
+$LSREGISTER -f "$CLAUDE_DIR/$APP_NAME"
+echo "  $APP_NAME installed and registered."
 
-# 5. Send test notifications to trigger macOS permission prompts
-echo "Triggering notification permissions (you may see test notifications)..."
-for variant in Alerts Banners; do
-  NOTIFIER="$CLAUDE_DIR/ClaudeNotifications ${variant}.app/Contents/MacOS/terminal-notifier"
-  "$NOTIFIER" -title "Claude Code Setup" -message "Notifications enabled" -group "claude-setup-${variant}" 2>/dev/null || true
-done
-# Brief pause then remove the test notifications
+# 5. Send test notification to trigger macOS permission prompt
+echo "Triggering notification permission (you may see a test notification)..."
+NOTIFIER="$CLAUDE_DIR/$APP_NAME/Contents/MacOS/terminal-notifier"
+"$NOTIFIER" -title "Claude Code Setup" -message "Notifications enabled" -group "claude-setup" 2>/dev/null || true
+# Brief pause then remove the test notification
 sleep 1
-for variant in Alerts Banners; do
-  NOTIFIER="$CLAUDE_DIR/ClaudeNotifications ${variant}.app/Contents/MacOS/terminal-notifier"
-  "$NOTIFIER" -remove "claude-setup-${variant}" 2>/dev/null || true
-done
+"$NOTIFIER" -remove "claude-setup" 2>/dev/null || true
 
-# 5b. Set notification grouping to Off for both app bundles
+# 5b. Set notification grouping to Off for the app bundle
 echo "Setting notification grouping to Off..."
 python3 -c "
 import subprocess, plistlib, sys, time
 
 targets = [
+    'com.anthropic.claude-code-notifier',
+]
+
+# Also clean up old bundle IDs from ncprefs
+old_ids = [
     'com.anthropic.claude-code-notifier-persistent',
     'com.anthropic.claude-code-notifier-banner',
 ]
@@ -107,7 +103,7 @@ def read_plist():
         return None
     return plistlib.loads(result.stdout)
 
-# Poll for up to 15 seconds waiting for both apps to be registered
+# Poll for up to 15 seconds waiting for app to be registered
 pl = None
 found = set()
 for attempt in range(8):
@@ -125,15 +121,22 @@ if pl is None:
     print('  WARNING: Could not read notification preferences.')
     sys.exit(0)
 
-# Set grouping = 2 (Off) for registered apps
+# Set grouping = 2 (Off) for registered app, remove old entries
 changed = False
+apps_to_keep = []
 for app in pl.get('apps', []):
-    if app.get('bundle-id', '') in targets:
+    bid = app.get('bundle-id', '')
+    if bid in old_ids:
+        changed = True
+        continue  # Remove old entries
+    if bid in targets:
         if app.get('grouping') != 2:
             app['grouping'] = 2
             changed = True
+    apps_to_keep.append(app)
 
 if changed:
+    pl['apps'] = apps_to_keep
     data = plistlib.dumps(pl, fmt=plistlib.FMT_BINARY)
     wr = subprocess.run(['defaults', 'import', 'com.apple.ncprefs', '-'], input=data)
     if wr.returncode == 0:
@@ -144,7 +147,7 @@ if changed:
 elif found:
     print('  Notification grouping already set.')
 else:
-    print('  WARNING: Apps not yet registered in Notification Center.')
+    print('  WARNING: App not yet registered in Notification Center.')
 "
 
 # 6. Copy notify.sh and config
@@ -168,7 +171,6 @@ cp "$SCRIPT_DIR/config-ui.py" "$CLAUDE_DIR/config-ui.py"
 # 8. Build clickable launcher app (in /Applications/ for Spotlight/Launchpad)
 echo "Building ClaudeNotifications.app launcher..."
 LAUNCHER_APP="/Applications/ClaudeNotifications.app"
-rm -rf "$CLAUDE_DIR/ClaudeNotifications.app"  # remove old location
 rm -f "$CLAUDE_DIR/Configure Notifications.command"  # remove legacy
 rm -rf "$LAUNCHER_APP"
 osacompile -o "$LAUNCHER_APP" \
@@ -229,8 +231,7 @@ echo ""
 echo "=== Enable Notifications ==="
 echo "System Settings will open to the Notifications page."
 echo "Please enable notifications for:"
-echo "  - ClaudeNotifications Alerts"
-echo "  - ClaudeNotifications Banners"
+echo "  - ClaudeNotifications"
 echo ""
 osascript -e 'tell application id "com.apple.systempreferences" to quit' 2>/dev/null || true
 sleep 0.5

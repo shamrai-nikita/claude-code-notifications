@@ -4,6 +4,7 @@
   "default_volume": 7,
   "default_style": "banner",
   "default_sound_enabled": true,
+  "default_timeout": 5,
   "events": {
     "permission_request": {
       "enabled": true,

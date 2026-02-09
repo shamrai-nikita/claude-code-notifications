@@ -1,6 +1,6 @@
 # Claude Code Notifications — macOS
 
-Native macOS notification system for Claude Code. Shows notifications with a custom bell-with-sparkle icon and configurable sounds when Claude needs attention or finishes a task. Supports per-event persistent or banner alert styles.
+Native macOS notification system for Claude Code. Shows notifications with a custom bell-with-sparkle icon and configurable sounds when Claude needs attention or finishes a task. Supports per-event persistent or temporary alert styles with configurable auto-dismiss timeout.
 
 ## Architecture
 
@@ -8,16 +8,11 @@ Native macOS notification system for Claude Code. Shows notifications with a cus
 ~/.claude/
 ├── notify.sh                       # Main script — hook handler
 ├── notify-click.sh                 # Click handler — activates terminal + switches tab
-├── notify-config.json              # User config (sounds, volume, style, enable/disable per event)
+├── notify-config.json              # User config (sounds, volume, style, timeout, enable/disable per event)
 ├── config-ui.py                    # Browser-based settings UI (python3, zero deps, auto-shutdown)
-├── ClaudeNotifications Alerts.app/  # Persistent alert style (stays on screen)
+├── ClaudeNotifications.app/        # Single notifier app (alert style, dismiss via background timer)
 │   └── Contents/
-│       ├── Info.plist              # Bundle ID: com.anthropic.claude-code-notifier-persistent
-│       ├── MacOS/terminal-notifier
-│       └── Resources/Claude.icns
-├── ClaudeNotifications Banners.app/ # Banner alert style (auto-dismisses)
-│   └── Contents/
-│       ├── Info.plist              # Bundle ID: com.anthropic.claude-code-notifier-banner
+│       ├── Info.plist              # Bundle ID: com.anthropic.claude-code-notifier
 │       ├── MacOS/terminal-notifier
 │       └── Resources/Claude.icns
 ├── claude-icon-large.png           # Custom bell-with-sparkle icon (copied from repo icon.png)
@@ -41,8 +36,8 @@ Claude Code hooks (defined in `~/.claude/settings.json`) trigger `notify.sh` on 
 The script reads JSON from stdin (hook event data), loads `notify-config.json`, and:
 1. Resolves event key, title, body text
 2. Checks if the event is `enabled` in config — exits if disabled
-3. Selects the correct notifier app based on the event's `style` setting (persistent or banner)
-4. Sends notification via the selected `ClaudeNotifications *.app`
+3. Sends notification via `ClaudeNotifications.app` (single app bundle, alert style)
+4. For temporary style: spawns a background dismiss timer (`sleep $TIMEOUT && -remove`)
 5. Plays sound via `afplay` at configured volume (skipped if `sound_enabled` is false)
 
 Clicking a notification activates the terminal and switches to the correct tab. The terminal is auto-detected from `$TERM_PROGRAM`:
@@ -59,10 +54,11 @@ Clicking a notification activates the terminal and switches to the correct tab. 
 
 ## Key design decisions
 
-- **Two app bundles**: macOS locks notification style to the app bundle. To support per-event persistent vs banner, we build two variants of the notifier app with different bundle IDs and `NSUserNotificationAlertStyle` values.
-- **Legacy fallback**: If the selected variant app doesn't exist, `notify.sh` falls back to the legacy single `ClaudeNotifier.app` for backward compatibility.
-- **Custom app bundles**: macOS locks notification icon to the sending app. `-appIcon` flag doesn't work on modern macOS. Solution: copy `terminal-notifier.app`, change bundle ID/name/icon. Uses a custom bell-with-sparkle icon (`icon.png` in repo). Binaries are re-signed with `codesign -s - --identifier <bundle-id>` so macOS treats them as distinct apps (not the original `terminal-notifier`). `notify.sh` also passes `-sender <bundle-id>` to reinforce the identity.
-- **Alert style**: Set via `NSUserNotificationAlertStyle` in Info.plist (`alert` for persistent, `banner` for banner). User must also configure in System Settings > Notifications.
+- **Single app bundle with background dismiss**: macOS locks notification style to the app bundle. Instead of two app bundles (Alerts + Banners), we use a single app with `alert` style and simulate "temporary" by spawning a background `(sleep $TIMEOUT && -remove)` process. This gives users one entry in System Settings > Notifications instead of two, plus configurable dismiss timeout (instead of macOS's fixed ~5s for banners).
+- **Legacy fallback**: If the single app doesn't exist, `notify.sh` falls back to `ClaudeNotifications Alerts.app` → `ClaudeNotifierPersistent.app` → `ClaudeNotifier.app` for backward compatibility.
+- **Custom app bundle**: macOS locks notification icon to the sending app. `-appIcon` flag doesn't work on modern macOS. Solution: copy `terminal-notifier.app`, change bundle ID/name/icon. Uses a custom bell-with-sparkle icon (`icon.png` in repo). Binary is re-signed with `codesign -s - --identifier <bundle-id>` so macOS treats it as a distinct app (not the original `terminal-notifier`). `notify.sh` also passes `-sender <bundle-id>` to reinforce the identity.
+- **Alert style**: Set via `NSUserNotificationAlertStyle = alert` in Info.plist. The "temporary" behavior is achieved via `terminal-notifier -remove GROUP_ID` after a configurable timeout. User must configure in System Settings > Notifications.
+- **Dismiss timer race conditions**: Each new notification kills the previous session's dismiss timer PID (stored in `.dpid` marker files) before sending. PostToolUse/UserPromptSubmit hooks also kill timers. If a timer fires on an already-dismissed notification, `-remove` is a no-op.
 - **Terminal auto-detection**: `notify.sh` reads `$TERM_PROGRAM` to detect the terminal and captures a tab identifier (iTerm2 session ID, Terminal.app TTY). On click, `notify-click.sh` uses AppleScript to switch to the exact tab. Warp lacks AppleScript tab support, so only app-level activation is possible.
 - **`-execute` over `-activate`**: `terminal-notifier` flags are mutually exclusive. We use `-execute` to run `notify-click.sh` on click, which both activates the app and switches tabs. Falls back to no activation flag if terminal is unknown.
 - **Single python3 call**: All JSON parsing (stdin + config file) in one python3 invocation for performance.
@@ -78,6 +74,7 @@ Clicking a notification activates the terminal and switches to the correct tab. 
   "default_volume": 7,
   "default_style": "banner",
   "default_sound_enabled": true,
+  "default_timeout": 5,
   "events": {
     "permission_request": { "enabled": true, "sound": "Funk", "volume": 7, "style": "banner", "sound_enabled": true },
     "elicitation_dialog": { "enabled": true, "sound": "Glass", "volume": 7, "style": "banner", "sound_enabled": true },
@@ -89,11 +86,13 @@ Clicking a notification activates the terminal and switches to the correct tab. 
 - **`enabled`**: `true`/`false` — skip notification entirely when false
 - **`sound`**: macOS system sound name — Basso, Blow, Bottle, Frog, Funk, Glass, Hero, Morse, Ping, Pop, Purr, Sosumi, Submarine, Tink
 - **`volume`**: number passed to `afplay -v` (1=quiet, 7=normal, 10=loud, 20=very loud)
-- **`style`**: `"persistent"` (stays on screen) or `"banner"` (auto-dismisses)
+- **`style`**: `"persistent"` (stays on screen) or `"banner"` (auto-dismisses after timeout)
 - **`sound_enabled`**: `true`/`false` — when false, notification is shown but no sound is played
+- **`timeout`**: seconds before a temporary notification auto-dismisses (1-60, default 5). Only applies when `style` is `"banner"`.
+- **`default_timeout`**: fallback timeout for events that don't specify `timeout` (defaults to `5` if missing)
 - **`default_sound_enabled`**: fallback for events that don't specify `sound_enabled` (defaults to `true` if missing)
-- Per-event settings fall back to `default_sound`/`default_volume`/`default_style`/`default_sound_enabled`, then hardcoded defaults (Funk/10/banner/true)
-- **Backward compat**: Missing `style` or `sound_enabled` fields default to their respective `default_*` values. Existing configs work unchanged.
+- Per-event settings fall back to `default_sound`/`default_volume`/`default_style`/`default_sound_enabled`/`default_timeout`, then hardcoded defaults (Funk/7/banner/true/5)
+- **Backward compat**: Missing `style`, `sound_enabled`, or `timeout` fields default to their respective `default_*` values. Existing configs work unchanged.
 
 ## Settings UI
 
@@ -107,7 +106,7 @@ open /Applications/ClaudeNotifications.app
 python3 ~/.claude/config-ui.py
 ```
 
-This opens a local web page where you can configure all notification settings: enable/disable events, choose sounds, adjust volume, mute sound per event, set persistent vs banner style, switch between dark/light themes, and preview notifications. The server auto-shuts down when the browser tab is closed (heartbeat watchdog).
+This opens a local web page where you can configure all notification settings: enable/disable events, choose sounds, adjust volume, mute sound per event, set persistent vs temporary style, configure dismiss timeout, switch between dark/light themes, and preview notifications. The server auto-shuts down when the browser tab is closed (heartbeat watchdog).
 
 ## Hooks config in settings.json
 
@@ -138,17 +137,15 @@ Only the `hooks` section is relevant (the rest is user-specific):
 This single command handles everything:
 1. Installs `terminal-notifier` via Homebrew (if missing)
 2. Copies custom icon from repo and converts to `.icns`
-3. Builds two `ClaudeNotifications *.app` bundles (Alerts + Banners) with custom icon
-4. Removes legacy app bundles if present
-5. Sends test notifications to trigger macOS permission prompts
-6. Copies `notify.sh`, `notify-click.sh`, `notify-config.json`, and `config-ui.py` to `~/.claude/`
-7. Builds `ClaudeNotifications.app` launcher (invisible — no Terminal window) to `/Applications/`
-8. Automatically merges hooks into `~/.claude/settings.json` (creates if missing, preserves existing settings)
-9. Opens System Settings and prompts user to enable notifications for both apps
+3. Builds single `ClaudeNotifications.app` bundle with custom icon (removes all legacy app bundles)
+4. Sends test notification to trigger macOS permission prompt
+5. Copies `notify.sh`, `notify-click.sh`, `notify-config.json`, and `config-ui.py` to `~/.claude/`
+6. Builds `ClaudeNotifications.app` launcher (invisible — no Terminal window) to `/Applications/`
+7. Automatically merges hooks into `~/.claude/settings.json` (creates if missing, preserves existing settings)
+8. Opens System Settings and prompts user to enable notifications
 
 If auto-configuration fails (warnings shown during install), enable manually:
-1. System Settings > Notifications > **ClaudeNotifications Alerts** > enable notifications
-2. System Settings > Notifications > **ClaudeNotifications Banners** > enable notifications
+1. System Settings > Notifications > **ClaudeNotifications** > enable notifications
 
 Then restart Claude Code sessions (or run `/hooks` to reload).
 
@@ -172,21 +169,22 @@ Interactive uninstall with confirmation prompt.
 
 Both methods remove all notification components:
 1. Removes notification hooks from `~/.claude/settings.json` (preserves all other settings)
-2. Clears delivered notifications
-3. Unregisters app bundles from LaunchServices
-4. Deletes all installed files (notify.sh, notify-click.sh, config, UI, icon, app bundles) and launcher from `/Applications/`
-5. Removes entries from Notification Center database (`com.anthropic.claude-code-notifier*`) and restarts `usernoted` so they disappear from System Settings > Notifications
+2. Kills background dismiss timer processes
+3. Clears delivered notifications
+4. Unregisters app bundles from LaunchServices
+5. Deletes all installed files (notify.sh, notify-click.sh, config, UI, icon, app bundles) and launcher from `/Applications/`
+6. Removes entries from Notification Center database (`com.anthropic.claude-code-notifier*`) and restarts `usernoted` so they disappear from System Settings > Notifications
 
 Neither method removes `terminal-notifier` Homebrew package or `~/.claude/` directory. Both are idempotent — safe to run multiple times.
 
 ## Testing
 
 ```bash
-# Test permission notification (persistent style)
-echo '{"hook_event_name":"PermissionRequest","tool_name":"Bash","tool_input":{"command":"rm -rf /"}}' | bash ~/.claude/notify.sh
-
-# Test stop notification (banner style by default)
+# Test temporary notification (auto-dismisses after 5s)
 echo '{"hook_event_name":"Stop","stop_hook_active":false}' | bash ~/.claude/notify.sh
+
+# Test permission notification
+echo '{"hook_event_name":"PermissionRequest","tool_name":"Bash","tool_input":{"command":"rm -rf /"}}' | bash ~/.claude/notify.sh
 
 # Test elicitation
 echo '{"hook_event_name":"Notification","notification_type":"elicitation_dialog","message":"Which approach?"}' | bash ~/.claude/notify.sh
@@ -206,7 +204,6 @@ python3 ~/.claude/config-ui.py
 | `notify-config.json` | User-editable config |
 | `config-ui.py` | Browser-based settings UI (with heartbeat auto-shutdown) |
 | `ClaudeNotifications.app` | Settings launcher in `/Applications/` (built at install time via `osacompile`, not in repo) |
-| `install.sh` | Setup script — builds notifier apps, copies icon, installs to ~/.claude/ and /Applications/ |
+| `install.sh` | Setup script — builds notifier app, copies icon, installs to ~/.claude/ and /Applications/ |
 | `uninstall.sh` | Removes all notification components from ~/.claude/ and /Applications/ |
-| `ClaudeNotifierPersistent.plist` | Info.plist template for the Alerts app (persistent style) |
-| `ClaudeNotifierBanner.plist` | Info.plist template for the Banners app (banner style) |
+| `ClaudeNotifications.plist` | Info.plist template for the notifier app (alert style) |

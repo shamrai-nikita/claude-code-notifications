@@ -17,12 +17,12 @@ FILES_TO_REMOVE=(
   "$CLAUDE_DIR/.notify-installed"
 )
 DIRS_TO_REMOVE=(
+  "$CLAUDE_DIR/ClaudeNotifications.app"
   "$CLAUDE_DIR/ClaudeNotifications Alerts.app"
   "$CLAUDE_DIR/ClaudeNotifications Banners.app"
   "$CLAUDE_DIR/ClaudeNotifierPersistent.app"
   "$CLAUDE_DIR/ClaudeNotifierBanner.app"
   "$CLAUDE_DIR/ClaudeNotifier.app"
-  "$CLAUDE_DIR/ClaudeNotifications.app"
   "/Applications/ClaudeNotifications.app"
   "$CLAUDE_DIR/.notify-uninstall.lock"
   "$CLAUDE_DIR/.persistent-notifications"
@@ -99,10 +99,18 @@ else
   echo "No settings.json found — skipping hook removal."
 fi
 
-# 2. Clear delivered notifications
+# 2. Kill background dismiss timer processes
+if [ -d "$CLAUDE_DIR/.persistent-notifications" ]; then
+  echo "Killing background dismiss timers..."
+  for dpid_file in "$CLAUDE_DIR/.persistent-notifications"/*.dpid; do
+    [ -f "$dpid_file" ] && kill "$(cat "$dpid_file")" 2>/dev/null || true
+  done
+fi
+
+# 3. Clear delivered notifications
 echo "Clearing delivered notifications..."
-for group in claude-code-persistent claude-code-banner claude-code; do
-  for app_name in "ClaudeNotifications Alerts" "ClaudeNotifications Banners" ClaudeNotifierPersistent ClaudeNotifierBanner ClaudeNotifier; do
+for group in claude-code claude-code-persistent claude-code-banner; do
+  for app_name in ClaudeNotifications "ClaudeNotifications Alerts" "ClaudeNotifications Banners" ClaudeNotifierPersistent ClaudeNotifierBanner ClaudeNotifier; do
     notifier="$CLAUDE_DIR/${app_name}.app/Contents/MacOS/terminal-notifier"
     if [ -x "$notifier" ]; then
       "$notifier" -remove "$group" 2>/dev/null || true
@@ -111,7 +119,7 @@ for group in claude-code-persistent claude-code-banner claude-code; do
 done
 echo "  Done."
 
-# 3. Unregister app bundles from LaunchServices
+# 4. Unregister app bundles from LaunchServices
 echo "Unregistering app bundles..."
 for dir in "${DIRS_TO_REMOVE[@]}"; do
   if [ -d "$dir" ]; then
@@ -120,7 +128,7 @@ for dir in "${DIRS_TO_REMOVE[@]}"; do
   fi
 done
 
-# 4. Delete files
+# 5. Delete files
 echo "Removing files..."
 for f in "${FILES_TO_REMOVE[@]}"; do
   if [ -f "$f" ]; then
@@ -130,7 +138,7 @@ for f in "${FILES_TO_REMOVE[@]}"; do
   fi
 done
 
-# 5. Delete app directories
+# 6. Delete app directories
 echo "Removing app bundles..."
 for dir in "${DIRS_TO_REMOVE[@]}"; do
   if [ -d "$dir" ]; then
@@ -140,7 +148,7 @@ for dir in "${DIRS_TO_REMOVE[@]}"; do
   fi
 done
 
-# 6. Remove entries from Notification Center database
+# 7. Remove entries from Notification Center database
 # Must kill usernoted BEFORE modifying the DB — it holds the file open and
 # will overwrite our changes on restart. After kill, launchd restarts it and
 # the new process reads the already-cleaned DB.
