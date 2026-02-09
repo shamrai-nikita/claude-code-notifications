@@ -379,6 +379,11 @@ HTML_PAGE = r"""<!DOCTYPE html>
   /* Style info wrap + tooltip */
   .style-info-wrap {
     display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+  }
+  .style-toggle-row {
+    display: flex;
     align-items: center;
     gap: 0.375rem;
   }
@@ -705,27 +710,18 @@ function render() {
             <span class="volume-val">${volume}</span>
           </div>
           <div class="style-info-wrap">
-            <div class="seg-control" id="style-${key}">
-              <label class="${style==='persistent'?'active':''}"
-                onclick="if(!this.closest('.event-section').classList.contains('disabled')){setRadio('style-${key}','persistent');setEventVal('${key}','style','persistent');render()}">
-                <input type="radio" name="style-${key}" value="persistent" ${style==='persistent'?'checked':''} ${enabled?'':'disabled'}><span>Persistent</span>
-              </label>
-              <label class="${style==='banner'?'active':''}"
-                onclick="if(!this.closest('.event-section').classList.contains('disabled')){setRadio('style-${key}','banner');setEventVal('${key}','style','banner');render()}">
-                <input type="radio" name="style-${key}" value="banner" ${style==='banner'?'checked':''} ${enabled?'':'disabled'}><span>Temporary</span>
-              </label>
-            </div>
-            <span class="info-icon">i<span class="info-tooltip"><strong>Persistent</strong> stays on screen until resolved or dismissed.<br><strong>Temporary</strong> auto-dismisses after the configured timeout.</span></span>
-          </div>
-        </div>
-        <div class="controls-row-secondary">
-          <div style="display:flex;align-items:center;gap:0.75rem;">
-            <div class="sound-toggle-group">
-              <span class="speaker-icon">${soundOn ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>' : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>'}</span>
-              <label class="toggle">
-                <input type="checkbox" ${soundOn?'checked':''} ${enabled?'':'disabled'} onchange="setEventVal('${key}','sound_enabled',this.checked);render()">
-                <span class="slider"></span>
-              </label>
+            <div class="style-toggle-row">
+              <div class="seg-control" id="style-${key}">
+                <label class="${style==='persistent'?'active':''}"
+                  onclick="if(!this.closest('.event-section').classList.contains('disabled')){setRadio('style-${key}','persistent');setEventVal('${key}','style','persistent');render()}">
+                  <input type="radio" name="style-${key}" value="persistent" ${style==='persistent'?'checked':''} ${enabled?'':'disabled'}><span>Persistent</span>
+                </label>
+                <label class="${style==='banner'?'active':''}"
+                  onclick="if(!this.closest('.event-section').classList.contains('disabled')){setRadio('style-${key}','banner');setEventVal('${key}','style','banner');render()}">
+                  <input type="radio" name="style-${key}" value="banner" ${style==='banner'?'checked':''} ${enabled?'':'disabled'}><span>Temporary</span>
+                </label>
+              </div>
+              <span class="info-icon">i<span class="info-tooltip"><strong>Persistent</strong> stays on screen until resolved or dismissed.<br><strong>Temporary</strong> auto-dismisses after the configured timeout.</span></span>
             </div>
             <div class="timeout-group ${isBanner?'':'hidden'}" id="timeout-${key}">
               <span class="timeout-label">Dismiss after</span>
@@ -733,6 +729,15 @@ function render() {
                 onchange="setEventVal('${key}','timeout',Math.max(1,Math.min(60,+this.value||5)))">
               <span class="timeout-unit">s</span>
             </div>
+          </div>
+        </div>
+        <div class="controls-row-secondary">
+          <div class="sound-toggle-group">
+            <span class="speaker-icon">${soundOn ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>' : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>'}</span>
+            <label class="toggle">
+              <input type="checkbox" ${soundOn?'checked':''} ${enabled?'':'disabled'} onchange="setEventVal('${key}','sound_enabled',this.checked);render()">
+              <span class="slider"></span>
+            </label>
           </div>
           <button class="btn-preview" onclick="previewEvt(this,'${key}')" ${enabled?'':'disabled'}><span class="play-icon">&#9654;</span> Preview</button>
         </div>
