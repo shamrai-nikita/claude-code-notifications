@@ -50,21 +50,25 @@ iconutil -c icns "$ICONSET" -o "$CLAUDE_DIR/Claude.icns"
 rm -rf "$ICONSET"
 echo "Icon created."
 
-# 4. Build ClaudeNotifier app bundles (Persistent + Banner)
+# 4. Build ClaudeNotifier app bundles (Alerts + Banners)
 echo "Building ClaudeNotifier app bundles..."
 
-# Remove legacy single-variant app if present
-if [ -d "$CLAUDE_DIR/ClaudeNotifier.app" ]; then
-  echo "Removing legacy ClaudeNotifier.app..."
-  rm -rf "$CLAUDE_DIR/ClaudeNotifier.app"
-fi
+# Remove legacy app bundles if present
+for legacy in "ClaudeNotifier.app" "ClaudeNotifierPersistent.app" "ClaudeNotifierBanner.app"; do
+  if [ -d "$CLAUDE_DIR/$legacy" ]; then
+    echo "Removing legacy $legacy..."
+    rm -rf "$CLAUDE_DIR/$legacy"
+  fi
+done
 
-for variant in Persistent Banner; do
-  APP_NAME="ClaudeNotifier${variant}.app"
+for variant in Alerts Banners; do
+  APP_DIR="ClaudeNotifications ${variant}"
+  APP_NAME="${APP_DIR}.app"
+  PLIST_SRC="ClaudeNotifier$([ "$variant" = "Alerts" ] && echo Persistent || echo Banner).plist"
   echo "  Building $APP_NAME..."
   rm -rf "$CLAUDE_DIR/$APP_NAME"
   cp -R "$TN_APP" "$CLAUDE_DIR/$APP_NAME"
-  cp "$SCRIPT_DIR/ClaudeNotifier${variant}.plist" "$CLAUDE_DIR/$APP_NAME/Contents/Info.plist"
+  cp "$SCRIPT_DIR/$PLIST_SRC" "$CLAUDE_DIR/$APP_NAME/Contents/Info.plist"
   cp "$CLAUDE_DIR/Claude.icns" "$CLAUDE_DIR/$APP_NAME/Contents/Resources/Claude.icns"
   # Re-sign with our bundle ID so macOS treats it as a distinct app (not the original terminal-notifier)
   BUNDLE_ID=$(defaults read "$CLAUDE_DIR/$APP_NAME/Contents/Info.plist" CFBundleIdentifier)
@@ -76,43 +80,26 @@ done
 
 # 5. Send test notifications to trigger macOS permission prompts
 echo "Triggering notification permissions (you may see test notifications)..."
-for variant in Persistent Banner; do
-  NOTIFIER="$CLAUDE_DIR/ClaudeNotifier${variant}.app/Contents/MacOS/terminal-notifier"
+for variant in Alerts Banners; do
+  NOTIFIER="$CLAUDE_DIR/ClaudeNotifications ${variant}.app/Contents/MacOS/terminal-notifier"
   "$NOTIFIER" -title "Claude Code Setup" -message "Notifications enabled" -group "claude-setup-${variant}" 2>/dev/null || true
 done
 # Brief pause then remove the test notifications
 sleep 1
-for variant in Persistent Banner; do
-  NOTIFIER="$CLAUDE_DIR/ClaudeNotifier${variant}.app/Contents/MacOS/terminal-notifier"
+for variant in Alerts Banners; do
+  NOTIFIER="$CLAUDE_DIR/ClaudeNotifications ${variant}.app/Contents/MacOS/terminal-notifier"
   "$NOTIFIER" -remove "claude-setup-${variant}" 2>/dev/null || true
 done
 
-# 5b. Configure notification alert styles in system preferences
-# macOS ignores NSUserNotificationAlertStyle for unsigned apps, so we set it
-# directly in com.apple.ncprefs.plist (the Notification Center prefs store).
-echo "Configuring notification alert styles..."
+# 5b. Set notification grouping to Off for both app bundles
+echo "Setting notification grouping to Off..."
 python3 -c "
 import subprocess, plistlib, sys, time
 
-# --- Flag bits (matching real macOS ncprefs entries) ---
-BANNERS    = 1 << 3   # 8
-ALERTS     = 1 << 4   # 16
-BADGE      = 1 << 1   # 2
-SOUND      = 1 << 2   # 4
-REGISTERED = 1 << 13  # 8192
-SHOW_LOCK  = 1 << 23  # 8388608
-ALLOW      = 1 << 25  # 33554432
-
-# Persistent app gets Alerts style; Banner app gets Banners style
-targets = {
-    'com.anthropic.claude-code-notifier-persistent': ALERTS,
-    'com.anthropic.claude-code-notifier-banner': BANNERS,
-}
-
-app_paths = {
-    'com.anthropic.claude-code-notifier-persistent': '$CLAUDE_DIR/ClaudeNotifierPersistent.app',
-    'com.anthropic.claude-code-notifier-banner': '$CLAUDE_DIR/ClaudeNotifierBanner.app',
-}
+targets = [
+    'com.anthropic.claude-code-notifier-persistent',
+    'com.anthropic.claude-code-notifier-banner',
+]
 
 def read_plist():
     result = subprocess.run(['defaults', 'export', 'com.apple.ncprefs', '-'], capture_output=True)
@@ -120,70 +107,45 @@ def read_plist():
         return None
     return plistlib.loads(result.stdout)
 
-def find_registered(pl):
-    found = set()
+# Poll for up to 15 seconds waiting for both apps to be registered
+pl = None
+found = set()
+for attempt in range(8):
+    pl = read_plist()
+    if pl is None:
+        break
     for app in pl.get('apps', []):
         if app.get('bundle-id', '') in targets:
             found.add(app['bundle-id'])
-    return found
-
-# --- Poll for up to 15 seconds waiting for macOS to register both apps ---
-pl = None
-found = set()
-for attempt in range(8):  # 0,1,...,7 → up to ~14s
-    pl = read_plist()
-    if pl is None:
-        print('  WARNING: Could not read notification preferences. Set alert styles manually.')
-        sys.exit(0)
-    found = find_registered(pl)
-    if found == set(targets.keys()):
+    if found == set(targets):
         break
     time.sleep(2)
 
-# --- Configure existing entries + create missing ones ---
-apps = pl.get('apps', [])
-configured = []
+if pl is None:
+    print('  WARNING: Could not read notification preferences.')
+    sys.exit(0)
 
-# Update entries that macOS already registered
-for app in apps:
-    bid = app.get('bundle-id', '')
-    if bid in targets:
-        flags = app.get('flags', 0)
-        flags &= ~(BANNERS | ALERTS)
-        flags |= targets[bid]
-        flags |= ALLOW | REGISTERED | SHOW_LOCK | BADGE | SOUND
-        app['flags'] = flags
-        app['grouping'] = 2
-        configured.append(bid.split('-')[-1])
+# Set grouping = 2 (Off) for registered apps
+changed = False
+for app in pl.get('apps', []):
+    if app.get('bundle-id', '') in targets:
+        if app.get('grouping') != 2:
+            app['grouping'] = 2
+            changed = True
 
-# Create entries for apps that macOS never registered (fresh install edge case)
-for bid, style_bit in targets.items():
-    if bid not in found:
-        flags = style_bit | ALLOW | REGISTERED | SHOW_LOCK | BADGE | SOUND
-        entry = {
-            'bundle-id': bid,
-            'flags': flags,
-            'path': app_paths[bid],
-            'content_visibility': 0,
-            'grouping': 2,
-        }
-        apps.append(entry)
-        configured.append(bid.split('-')[-1])
-
-pl['apps'] = apps
-
-if configured:
+if changed:
     data = plistlib.dumps(pl, fmt=plistlib.FMT_BINARY)
     wr = subprocess.run(['defaults', 'import', 'com.apple.ncprefs', '-'], input=data)
     if wr.returncode == 0:
         subprocess.run(['killall', 'usernoted'], capture_output=True)
-        subprocess.run(['killall', 'NotificationCenter'], capture_output=True)
-        print('  Alert styles configured: ' + ', '.join(configured))
+        print('  Notification grouping set to Off.')
     else:
-        print('  WARNING: Could not write notification preferences. Set alert styles manually.')
+        print('  WARNING: Could not write notification preferences.')
+elif found:
+    print('  Notification grouping already set.')
 else:
-    print('  WARNING: No notification entries to configure.')
-" || echo "  WARNING: Could not configure alert styles. Set manually in System Settings > Notifications."
+    print('  WARNING: Apps not yet registered in Notification Center.')
+"
 
 # 6. Copy notify.sh and config
 echo "Installing notify.sh and config..."
@@ -262,12 +224,21 @@ else:
     print('All hooks already configured.')
 "
 
+# 10. Prompt user to enable notifications in System Settings
+echo ""
+echo "=== Enable Notifications ==="
+echo "System Settings will open to the Notifications page."
+echo "Please enable notifications for:"
+echo "  - ClaudeNotifications Alerts"
+echo "  - ClaudeNotifications Banners"
+echo ""
+osascript -e 'tell application id "com.apple.systempreferences" to quit' 2>/dev/null || true
+sleep 0.5
+open "x-apple.systempreferences:com.apple.Notifications-Settings"
+read -p "Press Enter once you've enabled notifications..."
+
 echo ""
 echo "=== Installation complete ==="
-echo ""
-echo "IF ALERT STYLES WERE NOT AUTO-CONFIGURED (see warnings above):"
-echo "  1. System Settings > Notifications > ClaudeNotifications (Persistent) > set Alert Style to 'Alerts'"
-echo "  2. System Settings > Notifications > ClaudeNotifications (Vanishing) > leave as 'Banners'"
 echo ""
 echo "Configure settings:"
 echo "  Double-click: /Applications/ClaudeNotifications.app"

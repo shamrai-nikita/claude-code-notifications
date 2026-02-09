@@ -10,12 +10,12 @@ Native macOS notification system for Claude Code. Shows notifications with a cus
 ├── notify-click.sh                 # Click handler — activates terminal + switches tab
 ├── notify-config.json              # User config (sounds, volume, style, enable/disable per event)
 ├── config-ui.py                    # Browser-based settings UI (python3, zero deps, auto-shutdown)
-├── ClaudeNotifierPersistent.app/   # Persistent alert style (stays on screen)
+├── ClaudeNotifications Alerts.app/  # Persistent alert style (stays on screen)
 │   └── Contents/
 │       ├── Info.plist              # Bundle ID: com.anthropic.claude-code-notifier-persistent
 │       ├── MacOS/terminal-notifier
 │       └── Resources/Claude.icns
-├── ClaudeNotifierBanner.app/       # Banner alert style (auto-dismisses)
+├── ClaudeNotifications Banners.app/ # Banner alert style (auto-dismisses)
 │   └── Contents/
 │       ├── Info.plist              # Bundle ID: com.anthropic.claude-code-notifier-banner
 │       ├── MacOS/terminal-notifier
@@ -42,7 +42,7 @@ The script reads JSON from stdin (hook event data), loads `notify-config.json`, 
 1. Resolves event key, title, body text
 2. Checks if the event is `enabled` in config — exits if disabled
 3. Selects the correct notifier app based on the event's `style` setting (persistent or banner)
-4. Sends notification via the selected `ClaudeNotifier*.app`
+4. Sends notification via the selected `ClaudeNotifications *.app`
 5. Plays sound via `afplay` at configured volume (skipped if `sound_enabled` is false)
 
 Clicking a notification activates the terminal and switches to the correct tab. The terminal is auto-detected from `$TERM_PROGRAM`:
@@ -138,16 +138,17 @@ Only the `hooks` section is relevant (the rest is user-specific):
 This single command handles everything:
 1. Installs `terminal-notifier` via Homebrew (if missing)
 2. Copies custom icon from repo and converts to `.icns`
-3. Builds two `ClaudeNotifier*.app` bundles (Persistent + Banner) with custom icon
-4. Removes legacy `ClaudeNotifier.app` if present
+3. Builds two `ClaudeNotifications *.app` bundles (Alerts + Banners) with custom icon
+4. Removes legacy app bundles if present
 5. Sends test notifications to trigger macOS permission prompts
 6. Copies `notify.sh`, `notify-click.sh`, `notify-config.json`, and `config-ui.py` to `~/.claude/`
 7. Builds `ClaudeNotifications.app` launcher (invisible — no Terminal window) to `/Applications/`
 8. Automatically merges hooks into `~/.claude/settings.json` (creates if missing, preserves existing settings)
+9. Opens System Settings and prompts user to enable notifications for both apps
 
-The installer auto-configures alert styles (persistent vs banner) by writing to `com.apple.ncprefs.plist`. It polls for up to 15 seconds (every 2s) waiting for macOS to register both app bundle IDs after the test notifications. If an app still isn't registered after the timeout, the installer creates the ncprefs entry from scratch with the correct flags, so notifications work even on a fresh machine where macOS registration is slow. Flag bits used match real macOS entries (`REGISTERED = 1 << 13`, `SHOW_LOCK = 1 << 23`) rather than `SHOW_NC = 1 << 0` which doesn't appear in production entries. If auto-configuration fails (warnings shown during install), set manually:
-1. System Settings > Notifications > **ClaudeNotifications (Persistent)** > set Alert Style to **Alerts**
-2. System Settings > Notifications > **ClaudeNotifications (Vanishing)** > leave as **Banners**
+If auto-configuration fails (warnings shown during install), enable manually:
+1. System Settings > Notifications > **ClaudeNotifications Alerts** > enable notifications
+2. System Settings > Notifications > **ClaudeNotifications Banners** > enable notifications
 
 Then restart Claude Code sessions (or run `/hooks` to reload).
 
@@ -173,7 +174,7 @@ Both methods remove all notification components:
 1. Removes notification hooks from `~/.claude/settings.json` (preserves all other settings)
 2. Clears delivered notifications
 3. Unregisters app bundles from LaunchServices
-4. Deletes all installed files (notify.sh, notify-click.sh, config, UI, icon, apps) and launcher from `/Applications/`
+4. Deletes all installed files (notify.sh, notify-click.sh, config, UI, icon, app bundles) and launcher from `/Applications/`
 5. Removes entries from Notification Center database (`com.anthropic.claude-code-notifier*`) and restarts `usernoted` so they disappear from System Settings > Notifications
 
 Neither method removes `terminal-notifier` Homebrew package or `~/.claude/` directory. Both are idempotent — safe to run multiple times.
@@ -207,5 +208,5 @@ python3 ~/.claude/config-ui.py
 | `ClaudeNotifications.app` | Settings launcher in `/Applications/` (built at install time via `osacompile`, not in repo) |
 | `install.sh` | Setup script — builds notifier apps, copies icon, installs to ~/.claude/ and /Applications/ |
 | `uninstall.sh` | Removes all notification components from ~/.claude/ and /Applications/ |
-| `ClaudeNotifierPersistent.plist` | Info.plist template for the persistent alert app |
-| `ClaudeNotifierBanner.plist` | Info.plist template for the banner alert app |
+| `ClaudeNotifierPersistent.plist` | Info.plist template for the Alerts app (persistent style) |
+| `ClaudeNotifierBanner.plist` | Info.plist template for the Banners app (banner style) |

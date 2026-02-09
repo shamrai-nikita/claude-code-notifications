@@ -14,8 +14,10 @@
 	<string>com.anthropic.claude-code-notifier-banner</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
+	<key>CFBundleDisplayName</key>
+	<string>ClaudeNotifications Banners</string>
 	<key>CFBundleName</key>
-	<string>ClaudeNotifications (Vanishing)</string>
+	<string>ClaudeNotifications Banners</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

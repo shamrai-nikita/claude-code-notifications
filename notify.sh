@@ -5,8 +5,8 @@
 # Clicking the notification activates the terminal and switches to the correct tab
 # Config: ~/.claude/notify-config.json
 
-NOTIFIER_PERSISTENT="$HOME/.claude/ClaudeNotifierPersistent.app/Contents/MacOS/terminal-notifier"
-NOTIFIER_BANNER="$HOME/.claude/ClaudeNotifierBanner.app/Contents/MacOS/terminal-notifier"
+NOTIFIER_PERSISTENT="$HOME/.claude/ClaudeNotifications Alerts.app/Contents/MacOS/terminal-notifier"
+NOTIFIER_BANNER="$HOME/.claude/ClaudeNotifications Banners.app/Contents/MacOS/terminal-notifier"
 NOTIFIER_LEGACY="$HOME/.claude/ClaudeNotifier.app/Contents/MacOS/terminal-notifier"
 CONFIG="$HOME/.claude/notify-config.json"
 
@@ -63,8 +63,8 @@ if changed:
 
   # 2. Clear delivered notifications
   for group in claude-code-persistent claude-code-banner claude-code; do
-    for variant in Persistent Banner ""; do
-      local notifier="$CLAUDE_DIR/ClaudeNotifier${variant}.app/Contents/MacOS/terminal-notifier"
+    for app_name in "ClaudeNotifications Alerts" "ClaudeNotifications Banners" ClaudeNotifierPersistent ClaudeNotifierBanner ClaudeNotifier; do
+      local notifier="$CLAUDE_DIR/${app_name}.app/Contents/MacOS/terminal-notifier"
       if [ -x "$notifier" ]; then
         "$notifier" -remove "$group" 2>/dev/null || true
       fi
@@ -72,7 +72,7 @@ if changed:
   done
 
   # 3. Unregister app bundles from LaunchServices
-  for dir in "$CLAUDE_DIR/ClaudeNotifierPersistent.app" "$CLAUDE_DIR/ClaudeNotifierBanner.app" "$CLAUDE_DIR/ClaudeNotifier.app"; do
+  for dir in "$CLAUDE_DIR/ClaudeNotifications Alerts.app" "$CLAUDE_DIR/ClaudeNotifications Banners.app" "$CLAUDE_DIR/ClaudeNotifierPersistent.app" "$CLAUDE_DIR/ClaudeNotifierBanner.app" "$CLAUDE_DIR/ClaudeNotifier.app"; do
     if [ -d "$dir" ]; then
       "$LSREGISTER" -u "$dir" 2>/dev/null || true
     fi
@@ -88,7 +88,9 @@ if changed:
   rm -f "$CLAUDE_DIR/.notify-installed" 2>/dev/null
   rm -rf "$CLAUDE_DIR/.persistent-notifications" 2>/dev/null
 
-  # 5. Delete app bundles
+  # 5. Delete app bundles (new + old names for backward compat)
+  rm -rf "$CLAUDE_DIR/ClaudeNotifications Alerts.app" 2>/dev/null
+  rm -rf "$CLAUDE_DIR/ClaudeNotifications Banners.app" 2>/dev/null
   rm -rf "$CLAUDE_DIR/ClaudeNotifierPersistent.app" 2>/dev/null
   rm -rf "$CLAUDE_DIR/ClaudeNotifierBanner.app" 2>/dev/null
   rm -rf "$CLAUDE_DIR/ClaudeNotifier.app" 2>/dev/null

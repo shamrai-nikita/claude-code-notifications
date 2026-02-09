@@ -790,10 +790,10 @@ setInterval(() => fetch('/api/heartbeat', {method: 'POST'}).catch(() => {}), 300
 
 
 NOTIFIER_PERSISTENT = os.path.expanduser(
-    "~/.claude/ClaudeNotifierPersistent.app/Contents/MacOS/terminal-notifier"
+    "~/.claude/ClaudeNotifications Alerts.app/Contents/MacOS/terminal-notifier"
 )
 NOTIFIER_BANNER = os.path.expanduser(
-    "~/.claude/ClaudeNotifierBanner.app/Contents/MacOS/terminal-notifier"
+    "~/.claude/ClaudeNotifications Banners.app/Contents/MacOS/terminal-notifier"
 )
 NOTIFIER_LEGACY = os.path.expanduser(
     "~/.claude/ClaudeNotifier.app/Contents/MacOS/terminal-notifier"

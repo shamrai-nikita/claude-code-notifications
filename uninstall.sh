@@ -17,6 +17,8 @@ FILES_TO_REMOVE=(
   "$CLAUDE_DIR/.notify-installed"
 )
 DIRS_TO_REMOVE=(
+  "$CLAUDE_DIR/ClaudeNotifications Alerts.app"
+  "$CLAUDE_DIR/ClaudeNotifications Banners.app"
   "$CLAUDE_DIR/ClaudeNotifierPersistent.app"
   "$CLAUDE_DIR/ClaudeNotifierBanner.app"
   "$CLAUDE_DIR/ClaudeNotifier.app"
@@ -100,8 +102,8 @@ fi
 # 2. Clear delivered notifications
 echo "Clearing delivered notifications..."
 for group in claude-code-persistent claude-code-banner claude-code; do
-  for variant in Persistent Banner ""; do
-    notifier="$CLAUDE_DIR/ClaudeNotifier${variant}.app/Contents/MacOS/terminal-notifier"
+  for app_name in "ClaudeNotifications Alerts" "ClaudeNotifications Banners" ClaudeNotifierPersistent ClaudeNotifierBanner ClaudeNotifier; do
+    notifier="$CLAUDE_DIR/${app_name}.app/Contents/MacOS/terminal-notifier"
     if [ -x "$notifier" ]; then
       "$notifier" -remove "$group" 2>/dev/null || true
     fi
