@@ -31,7 +31,9 @@ Then run:
 ./install.sh
 ```
 
-Restart any running Claude Code sessions.
+After the script finishes, System Settings will open automatically. Enable notifications for **ClaudeNotifications** in System Settings > Notifications.
+
+Then restart any running Claude Code sessions.
 
 ## Settings UI
 
@@ -60,6 +62,27 @@ open /Applications/ClaudeNotifications.app
 ```
 
 Or drag `/Applications/ClaudeNotifications.app` to Trash — cleanup happens automatically on the next Claude Code hook event.
+
+<details>
+<summary><strong>Troubleshooting</strong></summary>
+
+**I hear sound but don't see notifications**
+
+Check that notifications for ClaudeNotifications are enabled in System Settings > Notifications.
+
+**Notifications cover each other**
+
+In System Settings > Notifications > ClaudeNotifications, set notification grouping to Off.
+
+**I don't see ClaudeNotifications in the notification apps list**
+
+Try locating it through the Applications section in Finder.
+
+**Notifications disappear after 5 seconds even though I set them to Persistent**
+
+In System Settings > Notifications > ClaudeNotifications, make sure the alert style is set to Alerts (called "Persistent" on macOS 15 and below).
+
+</details>
 
 ## Requirements
 
