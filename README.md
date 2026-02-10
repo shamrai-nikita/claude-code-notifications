@@ -6,7 +6,7 @@ Native macOS notifications when Claude Code needs your attention or finishes a t
 
 **Works with any terminal** — clicking a notification activates your terminal
 
-**Customizable** — sound, volume, persistent vs temporary style, and enable/disable per event type.
+**Customizable** — sound, volume, persistent vs temporary style, notification duration, and enable/disable per event type.
 
 **Browser-based settings UI** — configure everything from a local web page.
 
@@ -25,15 +25,29 @@ git clone https://github.com/shamrai-nikita/claude-code-notifications.git
 cd claude-code-notifications
 ```
 
-Then run:
+Then run `install.sh` — double-click it in Finder or run from the terminal:
 
 ```bash
 ./install.sh
 ```
 
-After the script finishes, System Settings will open automatically. Enable notifications for **ClaudeNotifications** in System Settings > Notifications.
+❗ Enable notifications for **ClaudeNotifications** in System Settings > Notifications.
 
-Then restart any running Claude Code sessions.
+<details>
+<summary>macOS 26 and above</summary>
+
+<img src="images/settings-macos26.png" width="500" alt="Enable notifications — macOS 26">
+
+</details>
+
+<details>
+<summary>macOS 15 and below</summary>
+
+<img src="images/settings-macos15.png" width="500" alt="Enable notifications — macOS 15">
+
+</details>
+
+✅ Done — you'll start receiving Claude Code notifications.
 
 ## Settings UI
 
@@ -63,24 +77,40 @@ open /Applications/ClaudeNotifications.app
 
 Or drag `/Applications/ClaudeNotifications.app` to Trash — cleanup happens automatically on the next Claude Code hook event.
 
-<details>
-<summary><strong>Troubleshooting</strong></summary>
+## Troubleshooting
 
-**I hear sound but don't see notifications**
+<details>
+<summary><strong>I hear sound but don't see notifications</strong></summary>
 
 Check that notifications for ClaudeNotifications are enabled in System Settings > Notifications.
 
-**Notifications cover each other**
+</details>
+
+<details>
+<summary><strong>Notifications cover each other</strong></summary>
 
 In System Settings > Notifications > ClaudeNotifications, set notification grouping to Off.
 
-**I don't see ClaudeNotifications in the notification apps list**
+</details>
+
+<details>
+<summary><strong>I don't see ClaudeNotifications in the notification apps list</strong></summary>
 
 Try locating it through the Applications section in Finder.
 
-**Notifications disappear after 5 seconds even though I set them to Persistent**
+</details>
 
-In System Settings > Notifications > ClaudeNotifications, make sure the alert style is set to Alerts (called "Persistent" on macOS 15 and below).
+<details>
+<summary><strong>Notifications disappear after 5 seconds even though I set them to Persistent</strong></summary>
+
+In System Settings > Notifications > ClaudeNotifications, make sure the alert style is set to Persistent ("Alerts" on macOS 15 and below).
+
+</details>
+
+<details>
+<summary><strong>Settings UI not saving settings or throwing an error</strong></summary>
+
+Close the browser tab and open the ClaudeNotifications app again.
 
 </details>
 
