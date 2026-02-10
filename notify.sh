@@ -280,8 +280,7 @@ case "$TERM_APP" in
   iTerm.app)      TAB_ID="${ITERM_SESSION_ID:-}" ;;
   Apple_Terminal)  TAB_ID="/dev/$(ps -o tty= -p $PPID 2>/dev/null | xargs)" ;;
   vscode)
-    # Cursor/VS Code: capture workspace name for window matching
-    TAB_ID="$(basename "${PWD:-}")"
+    TAB_ID=""
     # Detect actual app by walking process tree to find .app bundle
     _pid=$PPID
     while [ "$_pid" -gt 1 ] 2>/dev/null; do

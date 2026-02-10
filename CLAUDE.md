@@ -50,9 +50,9 @@ Clicking a notification activates the terminal and switches to the correct tab. 
 | `WarpTerminal` | Warp | App-level only (no AppleScript support) |
 | `iTerm.app` | iTerm2 | Full — switches to exact session tab via AppleScript |
 | `Apple_Terminal` | Terminal.app | Full — focuses window by TTY via AppleScript |
-| `vscode` | Cursor | Window + terminal panel — raises window by workspace name, focuses terminal via keystroke |
-| `vscode` | VS Code | Window + terminal panel — raises window by workspace name, focuses terminal via keystroke |
-| `vscode` | VSCodium | Window + terminal panel — raises window by workspace name, focuses terminal via keystroke |
+| `vscode` | Cursor | App-level only |
+| `vscode` | VS Code | App-level only |
+| `vscode` | VSCodium | App-level only |
 | Other/missing | Detected app or none | App-level only |
 
 ## Key design decisions

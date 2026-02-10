@@ -69,27 +69,7 @@ case "$TERM_APP" in
     ;;
 
   Cursor|"Visual Studio Code"|VSCodium)
-    if [ -n "$TAB_ID" ]; then
-      # Raise the window whose title contains the workspace name, then focus terminal panel
-      osascript -e "
-        tell application \"$TERM_APP\" to activate
-        tell application \"System Events\"
-          tell process \"$TERM_APP\"
-            repeat with w in windows
-              if name of w contains \"$TAB_ID\" then
-                perform action \"AXRaise\" of w
-                exit repeat
-              end if
-            end repeat
-            -- Focus terminal panel (Ctrl+backtick = default Toggle Terminal keybinding)
-            delay 0.2
-            keystroke \"\`\" using {control down}
-          end tell
-        end tell
-      " 2>/dev/null
-    else
-      open -a "$TERM_APP" 2>/dev/null || true
-    fi
+    open -a "$TERM_APP" 2>/dev/null || true
     ;;
 
   "")
