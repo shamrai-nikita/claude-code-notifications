@@ -87,5 +87,4 @@ In System Settings > Notifications > ClaudeNotifications, make sure the alert st
 ## Requirements
 
 - macOS 14+
-- Homebrew
 - Claude Code CLI

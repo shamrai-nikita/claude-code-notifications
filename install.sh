@@ -9,23 +9,40 @@ LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/A/Framewo
 
 echo "=== Claude Code Notifications Installer ==="
 
-# 1. Check/install terminal-notifier
-if ! command -v terminal-notifier &>/dev/null; then
-  echo "Installing terminal-notifier via Homebrew..."
-  brew install terminal-notifier
-else
-  echo "terminal-notifier already installed."
-fi
+# 1. Locate terminal-notifier.app (Homebrew preferred, bundled fallback)
+TN_APP=""
 
+# Try Homebrew cellar first (Intel, then Apple Silicon)
 TN_APP=$(find /usr/local/Cellar/terminal-notifier -name "terminal-notifier.app" -maxdepth 2 2>/dev/null | head -1)
 if [ -z "$TN_APP" ]; then
   TN_APP=$(find /opt/homebrew/Cellar/terminal-notifier -name "terminal-notifier.app" -maxdepth 2 2>/dev/null | head -1)
 fi
-if [ -z "$TN_APP" ]; then
-  echo "ERROR: Could not find terminal-notifier.app in Homebrew cellar."
-  exit 1
+
+# If not in cellar, try brew install (only if brew exists)
+if [ -z "$TN_APP" ] && command -v brew &>/dev/null; then
+  echo "Installing terminal-notifier via Homebrew..."
+  if brew install terminal-notifier 2>/dev/null; then
+    TN_APP=$(find /usr/local/Cellar/terminal-notifier -name "terminal-notifier.app" -maxdepth 2 2>/dev/null | head -1)
+    if [ -z "$TN_APP" ]; then
+      TN_APP=$(find /opt/homebrew/Cellar/terminal-notifier -name "terminal-notifier.app" -maxdepth 2 2>/dev/null | head -1)
+    fi
+  fi
 fi
-echo "Found terminal-notifier at: $TN_APP"
+
+# Fallback: bundled copy from repo
+if [ -z "$TN_APP" ]; then
+  if [ -d "$SCRIPT_DIR/vendor/terminal-notifier.app" ]; then
+    TN_APP="$SCRIPT_DIR/vendor/terminal-notifier.app"
+    echo "Using bundled terminal-notifier (Homebrew not available)."
+  else
+    echo "ERROR: Could not find terminal-notifier.app."
+    echo "  - Homebrew is not installed (or brew install failed)"
+    echo "  - Bundled copy not found at vendor/terminal-notifier.app"
+    exit 1
+  fi
+else
+  echo "Found terminal-notifier at: $TN_APP"
+fi
 
 # 2. Copy icon from repo and convert to PNG (source may be JPEG despite .png extension)
 echo "Installing icon..."

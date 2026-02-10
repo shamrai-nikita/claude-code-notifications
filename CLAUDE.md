@@ -19,6 +19,9 @@ Native macOS notification system for Claude Code. Shows notifications with a cus
 ├── Claude.icns                     # macOS icon set generated from the PNG
 └── .notify-installed               # Marker file — enables trash-based uninstall detection
 
+vendor/
+└── terminal-notifier.app/          # Bundled terminal-notifier v2.0.0 (Homebrew fallback)
+
 /Applications/
 └── ClaudeNotifications.app/        # Settings launcher (built by install.sh via osacompile)
 ```
@@ -65,6 +68,7 @@ Clicking a notification activates the terminal and switches to the correct tab. 
 - **Invisible launcher**: `ClaudeNotifications.app` is installed to `/Applications/` (visible in Spotlight/Launchpad). It's a minimal AppleScript app built via `osacompile` at install time. It runs the Python server as a background process (`do shell script ... &`), so no Terminal window is shown — the browser simply opens.
 - **Settings UI**: Self-contained Python 3 script (`config-ui.py`) serves a browser-based UI on localhost. Zero external dependencies.
 - **Heartbeat auto-shutdown**: The browser sends `POST /api/heartbeat` every 3s. A watchdog daemon thread waits 30s (grace period for browser to open), then exits if no heartbeat for 10s. This means closing the browser tab auto-stops the server.
+- **Bundled terminal-notifier fallback**: A copy of `terminal-notifier.app` v2.0.0 (~476KB) is committed in `vendor/`. The installer prefers the Homebrew version (potentially newer) but falls back to the bundled copy when Homebrew is unavailable. This removes Homebrew from the hard requirements.
 
 ## Config: notify-config.json
 
@@ -135,7 +139,7 @@ Only the `hooks` section is relevant (the rest is user-specific):
 ```
 
 This single command handles everything:
-1. Installs `terminal-notifier` via Homebrew (if missing)
+1. Locates `terminal-notifier.app` — checks Homebrew cellar first, tries `brew install` if available, falls back to bundled copy in `vendor/`
 2. Copies custom icon from repo and converts to `.icns`
 3. Builds single `ClaudeNotifications.app` bundle with custom icon (removes all legacy app bundles)
 4. Sends test notification to trigger macOS permission prompt
@@ -175,7 +179,7 @@ Both methods remove all notification components:
 5. Deletes all installed files (notify.sh, notify-click.sh, config, UI, icon, app bundles) and launcher from `/Applications/`
 6. Removes entries from Notification Center database (`com.anthropic.claude-code-notifier*`) and restarts `usernoted` so they disappear from System Settings > Notifications
 
-Neither method removes `terminal-notifier` Homebrew package or `~/.claude/` directory. Both are idempotent — safe to run multiple times.
+Neither method removes `terminal-notifier` Homebrew package (if installed) or `~/.claude/` directory. Both are idempotent — safe to run multiple times.
 
 ## Testing
 
@@ -207,3 +211,4 @@ python3 ~/.claude/config-ui.py
 | `install.sh` | Setup script — builds notifier app, copies icon, installs to ~/.claude/ and /Applications/ |
 | `uninstall.sh` | Removes all notification components from ~/.claude/ and /Applications/ |
 | `ClaudeNotifications.plist` | Info.plist template for the notifier app (alert style) |
+| `vendor/terminal-notifier.app` | Bundled terminal-notifier v2.0.0 (used when Homebrew is unavailable) |
