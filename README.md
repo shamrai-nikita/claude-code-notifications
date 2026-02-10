@@ -1,5 +1,9 @@
 # Claude Code Notifications for macOS
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![macOS 14+](https://img.shields.io/badge/macOS-14%2B-blue.svg)]()
+[![Latest Release](https://img.shields.io/github/v/release/shamrai-nikita/claude-code-notifications)](https://github.com/shamrai-nikita/claude-code-notifications/releases/latest)
+
 Native macOS notifications when Claude Code needs your attention or finishes a task. Configurable sounds and a browser-based settings UI.
 
 ## Why use this
@@ -62,12 +66,7 @@ open /Applications/ClaudeNotifications.app
 # or: python3 ~/.claude/config-ui.py
 ```
 
-<details>
-<summary>Settings UI preview</summary>
-
 <img src="images/settings-ui.png" width="400" alt="Settings UI">
-
-</details>
 
 ## Uninstall
 
