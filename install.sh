@@ -200,6 +200,32 @@ fi
 echo "Installing config-ui.py..."
 cp "$SCRIPT_DIR/config-ui.py" "$CLAUDE_DIR/config-ui.py"
 
+# 7b. Install VS Code extension for terminal tab switching
+echo "Installing VS Code extension..."
+VSIX="$SCRIPT_DIR/vendor/claude-code-notifications.vsix"
+_ext_installed=0
+if [ -f "$VSIX" ]; then
+  for _cli in code cursor codium; do
+    if command -v "$_cli" &>/dev/null; then
+      case "$_cli" in
+        code)   _editor="VS Code" ;;
+        cursor) _editor="Cursor" ;;
+        codium) _editor="VSCodium" ;;
+      esac
+      if "$_cli" --install-extension "$VSIX" --force 2>/dev/null; then
+        echo "  Installed for $_editor."
+        _ext_installed=$((_ext_installed + 1))
+      fi
+    fi
+  done
+  if [ "$_ext_installed" -eq 0 ]; then
+    echo "  No VS Code/Cursor/VSCodium CLI found — skipping."
+    echo "  (Terminal tab switching will use app-level activation only.)"
+  fi
+else
+  echo "  VSIX not found — skipping. (Build with: cd vscode-extension && npx @vscode/vsce package)"
+fi
+
 # 8. Build clickable launcher app (in /Applications/ for Spotlight/Launchpad)
 echo "Building ClaudeNotifications.app launcher..."
 LAUNCHER_APP="/Applications/ClaudeNotifications.app"

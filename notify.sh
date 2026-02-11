@@ -102,6 +102,11 @@ if changed:
   rm -rf "$CLAUDE_DIR/ClaudeNotifierBanner.app" 2>/dev/null
   rm -rf "$CLAUDE_DIR/ClaudeNotifier.app" 2>/dev/null
 
+  # 7b. Uninstall VS Code extension (if CLI available)
+  for _cli in code cursor codium; do
+    command -v "$_cli" &>/dev/null && "$_cli" --uninstall-extension anthropic.claude-code-notifications 2>/dev/null || true
+  done
+
   # 7. Clean Notification Center database entries
   local NCDB="$HOME/Library/Group Containers/group.com.apple.usernoted/db2/db"
   if [ -f "$NCDB" ]; then
@@ -280,10 +285,13 @@ case "$TERM_APP" in
   iTerm.app)      TAB_ID="${ITERM_SESSION_ID:-}" ;;
   Apple_Terminal)  TAB_ID="/dev/$(ps -o tty= -p $PPID 2>/dev/null | xargs)" ;;
   vscode)
-    TAB_ID=""
-    # Detect actual app by walking process tree to find .app bundle
+    # Detect actual app by walking process tree to find .app bundle.
+    # Collect ancestor PIDs along the way — one of them will match
+    # terminal.processId in the VS Code extension for tab switching.
     _pid=$PPID
+    _ancestor_pids=""
     while [ "$_pid" -gt 1 ] 2>/dev/null; do
+      _ancestor_pids="${_ancestor_pids:+${_ancestor_pids},}${_pid}"
       _args=$(ps -o args= -p $_pid 2>/dev/null)
       case "$_args" in
         */Cursor.app/*)                TERM_APP="Cursor"; break ;;
@@ -292,6 +300,7 @@ case "$TERM_APP" in
       esac
       _pid=$(ps -o ppid= -p $_pid 2>/dev/null | tr -d ' ')
     done
+    TAB_ID="$_ancestor_pids"
     ;;
   *)              TAB_ID="" ;;
 esac

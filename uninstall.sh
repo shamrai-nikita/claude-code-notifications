@@ -36,6 +36,7 @@ echo "  - notify.sh, notify-config.json, config-ui.py"
 echo "  - ClaudeNotifier*.app bundles"
 echo "  - Claude icon files"
 echo "  - ClaudeNotifications.app launcher (from /Applications/ and ~/.claude/)"
+echo "  - VS Code/Cursor extension (if installed)"
 echo "  - Notification Center entries (System Settings > Notifications)"
 echo ""
 echo "Will NOT remove:"
@@ -97,6 +98,26 @@ else:
   removed=$((removed + 1))
 else
   echo "No settings.json found — skipping hook removal."
+fi
+
+# 1b. Uninstall VS Code extension
+echo "Uninstalling VS Code extension..."
+_ext_removed=0
+for _cli in code cursor codium; do
+  if command -v "$_cli" &>/dev/null; then
+    case "$_cli" in
+      code)   _editor="VS Code" ;;
+      cursor) _editor="Cursor" ;;
+      codium) _editor="VSCodium" ;;
+    esac
+    if "$_cli" --uninstall-extension anthropic.claude-code-notifications 2>/dev/null; then
+      echo "  Removed from $_editor."
+      _ext_removed=$((_ext_removed + 1))
+    fi
+  fi
+done
+if [ "$_ext_removed" -eq 0 ]; then
+  echo "  No VS Code extension found to remove."
 fi
 
 # 2. Kill background dismiss timer processes

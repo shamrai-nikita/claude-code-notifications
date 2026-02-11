@@ -69,7 +69,21 @@ case "$TERM_APP" in
     ;;
 
   Cursor|"Visual Studio Code"|VSCodium)
-    open -a "$TERM_APP" 2>/dev/null || true
+    if [ -n "$TAB_ID" ]; then
+      # Map app name to URI scheme for the VS Code extension
+      case "$TERM_APP" in
+        Cursor)   _scheme="cursor" ;;
+        VSCodium) _scheme="vscodium" ;;
+        *)        _scheme="vscode" ;;
+      esac
+      # open with URI scheme both activates the app AND delivers the URI to the extension.
+      # If the extension isn't installed, the app still activates (graceful degradation).
+      # If even the URI open fails, fall back to simple app activation.
+      open "${_scheme}://anthropic.claude-code-notifications/focus?pids=${TAB_ID}" 2>/dev/null || \
+        open -a "$TERM_APP" 2>/dev/null || true
+    else
+      open -a "$TERM_APP" 2>/dev/null || true
+    fi
     ;;
 
   "")
