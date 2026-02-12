@@ -37,6 +37,7 @@ echo "  - ClaudeNotifier*.app bundles"
 echo "  - Claude icon files"
 echo "  - ClaudeNotifications.app launcher (from /Applications/ and ~/.claude/)"
 echo "  - VS Code/Cursor extension (if installed)"
+echo "  - JetBrains plugin (if installed)"
 echo "  - Notification Center entries (System Settings > Notifications)"
 echo ""
 echo "Will NOT remove:"
@@ -129,6 +130,25 @@ done
 if [ "$_ext_removed" -eq 0 ]; then
   echo "  No VS Code extension found to remove."
 fi
+
+# 1c. Uninstall JetBrains plugin
+echo "Uninstalling JetBrains plugin..."
+_jb_removed=0
+JB_SUPPORT="$HOME/Library/Application Support/JetBrains"
+if [ -d "$JB_SUPPORT" ]; then
+  for jb_dir in "$JB_SUPPORT"/*/plugins/claude-code-notifications; do
+    if [ -d "$jb_dir" ]; then
+      rm -rf "$jb_dir"
+      echo "  Removed from $(basename "$(dirname "$(dirname "$jb_dir")")")"
+      _jb_removed=$((_jb_removed + 1))
+    fi
+  done
+fi
+if [ "$_jb_removed" -eq 0 ]; then
+  echo "  No JetBrains plugin found to remove."
+fi
+# Remove JetBrains notification server port files
+rm -rf "$HOME/.claude/.jb-notify" 2>/dev/null
 
 # 2. Kill background dismiss timer processes
 if [ -d "$CLAUDE_DIR/.persistent-notifications" ]; then

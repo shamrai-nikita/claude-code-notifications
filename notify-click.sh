@@ -3,9 +3,9 @@
 # Called by terminal-notifier when the user clicks a notification.
 # Activates the terminal app and switches to the correct tab if possible.
 #
-# Usage: notify-click.sh <TERM_PROGRAM> <TAB_ID>
-#   TERM_PROGRAM: WarpTerminal, iTerm.app, Apple_Terminal, or app name
-#   TAB_ID:       Terminal-specific tab identifier (session ID, TTY path, etc.)
+# Usage: notify-click.sh <TERM_PROGRAM> <TAB_ID> <SESSION_ID>
+#   TERM_PROGRAM: WarpTerminal, iTerm.app, Apple_Terminal, JetBrains, or app name
+#   TAB_ID:       Terminal-specific tab identifier (session ID, TTY path, uuid|port|pid, etc.)
 
 TERM_APP="${1:-}"
 TAB_ID="${2:-}"
@@ -83,6 +83,29 @@ case "$TERM_APP" in
         open -a "$TERM_APP" 2>/dev/null || true
     else
       open -a "$TERM_APP" 2>/dev/null || true
+    fi
+    ;;
+
+  JetBrains)
+    if [ -n "$TAB_ID" ]; then
+      # Parse tab_id, port, and IDE PID from pipe-delimited TAB_ID
+      IFS='|' read -r _tab_uuid _port _ide_pid <<< "$TAB_ID"
+      # Focus the correct terminal tab via plugin's HTTP server
+      curl -s --max-time 2 "http://127.0.0.1:${_port}/focus?tab_id=${_tab_uuid}" 2>/dev/null || true
+      # Bring the IDE window to front (targets specific process by PID)
+      if [ -n "$_ide_pid" ]; then
+        osascript -e "
+          tell application \"System Events\"
+            try
+              set frontmost of first process whose unix id is ${_ide_pid} to true
+            end try
+          end tell
+        " 2>/dev/null || true
+      fi
+    else
+      # No plugin installed: activate IntelliJ generically
+      osascript -e 'tell application "IntelliJ IDEA" to activate' 2>/dev/null || \
+        osascript -e 'tell application "IntelliJ IDEA CE" to activate' 2>/dev/null || true
     fi
     ;;
 

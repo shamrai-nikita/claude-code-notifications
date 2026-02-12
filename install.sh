@@ -279,6 +279,39 @@ else
   echo "  VSIX not found — skipping. (Build with: cd vscode-extension && npx @vscode/vsce package)"
 fi
 
+# 7c. Install JetBrains plugin for terminal tab switching
+echo "Installing JetBrains plugin..."
+JB_ZIP="$SCRIPT_DIR/vendor/claude-code-notifications-jetbrains.zip"
+_jb_installed=0
+if [ -f "$JB_ZIP" ]; then
+  # Find all JetBrains IDE config directories
+  JB_SUPPORT="$HOME/Library/Application Support/JetBrains"
+  if [ -d "$JB_SUPPORT" ]; then
+    for jb_dir in "$JB_SUPPORT"/*/; do
+      # Only install to IDE config dirs (IntelliJIdea*, IdeaIC*, PyCharm*, WebStorm*, etc.)
+      jb_name=$(basename "$jb_dir")
+      case "$jb_name" in
+        IntelliJIdea*|IdeaIC*|PyCharm*|PyCharmCE*|WebStorm*|CLion*|GoLand*|PhpStorm*|Rider*|RubyMine*|DataGrip*|RustRover*|DataSpell*|Aqua*)
+          plugins_dir="$jb_dir/plugins"
+          mkdir -p "$plugins_dir"
+          # Remove old version
+          rm -rf "$plugins_dir/claude-code-notifications"
+          # Install new version
+          unzip -qo "$JB_ZIP" -d "$plugins_dir"
+          echo "  Installed for $jb_name."
+          _jb_installed=$((_jb_installed + 1))
+          ;;
+      esac
+    done
+  fi
+  if [ "$_jb_installed" -eq 0 ]; then
+    echo "  No JetBrains IDE config directories found — skipping."
+    echo "  (Install manually: Settings > Plugins > gear icon > Install from Disk)"
+  fi
+else
+  echo "  JetBrains plugin ZIP not found — skipping."
+fi
+
 # 8. Build clickable launcher app (in /Applications/ for Spotlight/Launchpad)
 echo "Building ClaudeNotifications.app launcher..."
 LAUNCHER_APP="/Applications/ClaudeNotifications.app"
