@@ -121,6 +121,15 @@ if len(filtered) != len(exts):
     fi
   done
 
+  # 7c. Remove JetBrains plugin from all IDE config directories
+  JB_SUPPORT="$HOME/Library/Application Support/JetBrains"
+  if [ -d "$JB_SUPPORT" ]; then
+    for jb_dir in "$JB_SUPPORT"/*/plugins/claude-code-notifications; do
+      [ -d "$jb_dir" ] && rm -rf "$jb_dir"
+    done
+  fi
+  rm -rf "$CLAUDE_DIR/.jb-notify" 2>/dev/null
+
   # 7. Clean Notification Center database entries
   local NCDB="$HOME/Library/Group Containers/group.com.apple.usernoted/db2/db"
   if [ -f "$NCDB" ]; then
@@ -301,7 +310,20 @@ fi
 
 # Auto-detect terminal and tab identifier from environment
 TERM_APP="${TERM_PROGRAM:-}"
+
+# JetBrains IDE: detect via plugin env vars (specific) or TERMINAL_EMULATOR (generic)
+if [ -n "${CLAUDE_JB_NOTIFY_PORT:-}" ]; then
+  # Plugin installed: full tab-switching support
+  TERM_APP="JetBrains"
+  TAB_ID="${CLAUDE_JB_TAB_ID:-}|${CLAUDE_JB_NOTIFY_PORT}|${CLAUDE_JB_IDE_PID:-}"
+elif [ "${TERMINAL_EMULATOR:-}" = "JetBrains-JediTerm" ]; then
+  # JetBrains terminal without plugin: app-level activation only
+  TERM_APP="JetBrains"
+  TAB_ID=""
+fi
+
 case "$TERM_APP" in
+  JetBrains)      ;; # Already handled above
   WarpTerminal)   TAB_ID="" ;;
   iTerm.app)      TAB_ID="${ITERM_SESSION_ID:-}" ;;
   Apple_Terminal)  TAB_ID="/dev/$(ps -o tty= -p $PPID 2>/dev/null | xargs)" ;;
