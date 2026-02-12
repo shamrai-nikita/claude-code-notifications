@@ -102,9 +102,23 @@ if changed:
   rm -rf "$CLAUDE_DIR/ClaudeNotifierBanner.app" 2>/dev/null
   rm -rf "$CLAUDE_DIR/ClaudeNotifier.app" 2>/dev/null
 
-  # 7b. Uninstall VS Code extension (if CLI available)
-  for _cli in code cursor codium; do
-    command -v "$_cli" &>/dev/null && "$_cli" --uninstall-extension anthropic.claude-code-notifications 2>/dev/null || true
+  # 7b. Remove VS Code extension from extensions directories
+  for _ext_dir in "$HOME/.cursor/extensions" "$HOME/.vscode/extensions" "$HOME/.vscode-oss/extensions"; do
+    rm -rf "$_ext_dir"/anthropic.claude-code-notifications-* 2>/dev/null || true
+    # Remove stale entry from editor's extensions.json registry
+    if [ -f "$_ext_dir/extensions.json" ]; then
+      python3 -c "
+import json, sys
+path = sys.argv[1]
+with open(path) as f:
+    exts = json.load(f)
+filtered = [e for e in exts if e.get('identifier', {}).get('id') != 'anthropic.claude-code-notifications']
+if len(filtered) != len(exts):
+    with open(path, 'w') as f:
+        json.dump(filtered, f, indent='\t')
+        f.write('\n')
+" "$_ext_dir/extensions.json" 2>/dev/null || true
+    fi
   done
 
   # 7. Clean Notification Center database entries
@@ -202,6 +216,7 @@ except:
 events_config = config.get('events', {})
 
 # Determine event key and notification text
+known_event = True
 if event == 'PermissionRequest':
     event_key = 'permission_request'
     title = 'Claude Code - Permission Required'
@@ -221,12 +236,13 @@ elif event == 'Stop':
     title = 'Claude Code - Done'
     body = 'Finished responding'
 else:
+    known_event = False
     event_key = event.lower() if event else 'unknown'
     title = 'Claude Code'
     body = message or 'Event occurred'
 
 # Check global kill switch
-if not config.get('global_enabled', True):
+if not config.get('global_enabled', True) or not known_event:
     enabled = False
     sound = 'Funk'; volume = 7; style = 'banner'; sound_enabled = True; timeout = 5
 else:
@@ -254,6 +270,11 @@ print(f\"TITLE='{title}'\")
 print(f\"BODY='{body}'\")
 print(f\"SESSION_ID='{session_id}'\")
 " 2>/dev/null)
+
+# Guard: if Python failed, ENABLED was never set — exit silently
+if [ -z "${ENABLED+x}" ]; then
+  exit 0
+fi
 
 # Exit if this event is disabled
 if [ "$ENABLED" = "0" ]; then

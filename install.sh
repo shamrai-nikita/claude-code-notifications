@@ -205,22 +205,75 @@ echo "Installing VS Code extension..."
 VSIX="$SCRIPT_DIR/vendor/claude-code-notifications.vsix"
 _ext_installed=0
 if [ -f "$VSIX" ]; then
-  for _cli in code cursor codium; do
-    if command -v "$_cli" &>/dev/null; then
-      case "$_cli" in
-        code)   _editor="VS Code" ;;
-        cursor) _editor="Cursor" ;;
-        codium) _editor="VSCodium" ;;
-      esac
-      if "$_cli" --install-extension "$VSIX" --force 2>/dev/null; then
+  # Extract version from the VSIX's package.json (VSIX is a zip; extension/package.json has the version)
+  _ext_version=$(python3 -c "
+import zipfile, json, sys
+try:
+    with zipfile.ZipFile('$VSIX') as z:
+        with z.open('extension/package.json') as f:
+            print(json.load(f)['version'])
+except Exception as e:
+    print(f'ERROR: {e}', file=sys.stderr)
+    sys.exit(1)
+")
+  if [ -z "$_ext_version" ]; then
+    echo "  Could not read version from VSIX — skipping."
+  else
+    for _ext_entry in "$HOME/.cursor/extensions:Cursor" "$HOME/.vscode/extensions:VS Code" "$HOME/.vscode-oss/extensions:VSCodium"; do
+      _ext_dir="${_ext_entry%%:*}"
+      _editor="${_ext_entry##*:}"
+      if [ -d "$_ext_dir" ]; then
+        # Remove any old version(s)
+        rm -rf "$_ext_dir"/anthropic.claude-code-notifications-*
+        # Extract VSIX to temp dir, then move extension/ contents into place
+        _tmpdir=$(mktemp -d)
+        unzip -q "$VSIX" -d "$_tmpdir"
+        mv "$_tmpdir/extension" "$_ext_dir/anthropic.claude-code-notifications-$_ext_version"
+        rm -rf "$_tmpdir"
+        # Register in extensions.json so the editor recognizes the extension
+        python3 -c "
+import json, sys, uuid, time, os
+reg_path, ext_path, version = sys.argv[1], sys.argv[2], sys.argv[3]
+dir_name = os.path.basename(ext_path)
+exts = []
+if os.path.exists(reg_path):
+    with open(reg_path) as f:
+        exts = json.load(f)
+exts = [e for e in exts if e.get('identifier', {}).get('id') != 'anthropic.claude-code-notifications']
+ext_uuid = str(uuid.uuid4())
+exts.append({
+    'identifier': {'id': 'anthropic.claude-code-notifications', 'uuid': ext_uuid},
+    'version': version,
+    'location': {'\$mid': 1, 'path': ext_path, 'scheme': 'file'},
+    'relativeLocation': dir_name,
+    'metadata': {
+        'isApplicationScoped': False,
+        'isMachineScoped': False,
+        'isBuiltin': False,
+        'installedTimestamp': int(time.time() * 1000),
+        'pinned': False,
+        'source': 'vsix',
+        'id': ext_uuid,
+        'publisherDisplayName': 'Anthropic',
+        'targetPlatform': 'undefined',
+        'updated': False,
+        'isPreReleaseVersion': False,
+        'hasPreReleaseVersion': False,
+        'preRelease': False,
+    },
+})
+with open(reg_path, 'w') as f:
+    json.dump(exts, f, indent='\t')
+    f.write('\n')
+" "$_ext_dir/extensions.json" "$_ext_dir/anthropic.claude-code-notifications-$_ext_version" "$_ext_version" 2>/dev/null || true
         echo "  Installed for $_editor."
         _ext_installed=$((_ext_installed + 1))
       fi
+    done
+    if [ "$_ext_installed" -eq 0 ]; then
+      echo "  No VS Code/Cursor/VSCodium extensions directory found — skipping."
+      echo "  (Terminal tab switching will use app-level activation only.)"
     fi
-  done
-  if [ "$_ext_installed" -eq 0 ]; then
-    echo "  No VS Code/Cursor/VSCodium CLI found — skipping."
-    echo "  (Terminal tab switching will use app-level activation only.)"
   fi
 else
   echo "  VSIX not found — skipping. (Build with: cd vscode-extension && npx @vscode/vsce package)"

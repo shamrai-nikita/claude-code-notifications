@@ -103,17 +103,27 @@ fi
 # 1b. Uninstall VS Code extension
 echo "Uninstalling VS Code extension..."
 _ext_removed=0
-for _cli in code cursor codium; do
-  if command -v "$_cli" &>/dev/null; then
-    case "$_cli" in
-      code)   _editor="VS Code" ;;
-      cursor) _editor="Cursor" ;;
-      codium) _editor="VSCodium" ;;
-    esac
-    if "$_cli" --uninstall-extension anthropic.claude-code-notifications 2>/dev/null; then
-      echo "  Removed from $_editor."
-      _ext_removed=$((_ext_removed + 1))
+for _ext_entry in "$HOME/.cursor/extensions:Cursor" "$HOME/.vscode/extensions:VS Code" "$HOME/.vscode-oss/extensions:VSCodium"; do
+  _ext_dir="${_ext_entry%%:*}"
+  _editor="${_ext_entry##*:}"
+  if ls "$_ext_dir"/anthropic.claude-code-notifications-* &>/dev/null; then
+    rm -rf "$_ext_dir"/anthropic.claude-code-notifications-*
+    # Remove stale entry from editor's extensions.json registry
+    if [ -f "$_ext_dir/extensions.json" ]; then
+      python3 -c "
+import json, sys
+path = sys.argv[1]
+with open(path) as f:
+    exts = json.load(f)
+filtered = [e for e in exts if e.get('identifier', {}).get('id') != 'anthropic.claude-code-notifications']
+if len(filtered) != len(exts):
+    with open(path, 'w') as f:
+        json.dump(filtered, f, indent='\t')
+        f.write('\n')
+" "$_ext_dir/extensions.json" 2>/dev/null || true
     fi
+    echo "  Removed from $_editor."
+    _ext_removed=$((_ext_removed + 1))
   fi
 done
 if [ "$_ext_removed" -eq 0 ]; then
