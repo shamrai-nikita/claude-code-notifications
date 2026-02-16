@@ -50,6 +50,7 @@ EVENT_ORDER = ["permission_request", "elicitation_dialog", "stop"]
 
 DEFAULT_CONFIG = {
     "global_enabled": True,
+    "warp_native": True,
     "default_timeout": 5,
     "events": {
         "permission_request": {"enabled": True, "sound": "Funk", "volume": 4, "style": "banner", "sound_enabled": True},
@@ -564,6 +565,53 @@ HTML_PAGE = r"""<!DOCTYPE html>
     color: #fff;
   }
 
+  /* Advanced section */
+  .advanced-section {
+    border-top: 1px solid var(--color-border);
+    margin-top: 0.25rem;
+  }
+  .advanced-section summary {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.875rem 0;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+    transition: color 0.15s ease;
+  }
+  .advanced-section summary::-webkit-details-marker { display: none; }
+  .advanced-section summary::before {
+    content: "\25B6";
+    font-size: 0.5rem;
+    transition: transform 0.15s ease;
+  }
+  .advanced-section[open] summary::before {
+    transform: rotate(90deg);
+  }
+  .advanced-section summary:hover { color: var(--color-text); }
+  .advanced-section .advanced-content {
+    padding-bottom: 0.5rem;
+  }
+  .advanced-toggle-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.25rem 0 0.5rem;
+  }
+  .advanced-toggle-row .adv-label-group {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+  .advanced-toggle-row .adv-label {
+    font-weight: 500;
+    font-size: 0.875rem;
+  }
+
   /* Responsive */
   @media (max-width: 600px) {
     body { padding: 1.5rem 1rem 2rem; }
@@ -660,6 +708,11 @@ function toggleGlobal(checked) {
   render();
 }
 
+function toggleWarpNative(checked) {
+  config.warp_native = checked;
+  markDirty();
+}
+
 function render() {
   const app = document.getElementById('app');
   const globalOn = config.global_enabled !== undefined ? config.global_enabled : true;
@@ -746,6 +799,24 @@ function render() {
   }
 
   html += `</div>`; // close events-container
+
+  // Advanced section (collapsed by default)
+  const warpNative = config.warp_native !== undefined ? config.warp_native : true;
+  html += `<details class="advanced-section ${globalOn?'':'disabled'}" style="${globalOn?'':'opacity:0.35;pointer-events:none'}">
+    <summary>Advanced</summary>
+    <div class="advanced-content">
+      <div class="advanced-toggle-row">
+        <div class="adv-label-group">
+          <span class="adv-label">Warp Terminal — Native Notifications</span>
+          <span class="info-icon">i<span class="info-tooltip"><strong>Enabled</strong> — clicking a notification focuses the exact Warp tab. Sound and appearance are controlled by Warp.<br><br><strong>Disabled</strong> — clicking a notification activates Warp at the app level (no tab switching), but you get notifications with custom sound, icon and style from the settings above.</span></span>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" ${warpNative?'checked':''} onchange="toggleWarpNative(this.checked)">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+  </details>`;
 
   html += `<div class="save-area">
     <a class="github-link" href="https://github.com/shamrai-nikita/claude-code-notifications" target="_blank" rel="noopener noreferrer">

@@ -1,5 +1,6 @@
 {
   "global_enabled": true,
+  "warp_native": true,
   "default_sound": "Funk",
   "default_volume": 4,
   "default_style": "banner",

@@ -278,6 +278,7 @@ print(f\"TIMEOUT={timeout}\")
 print(f\"TITLE='{title}'\")
 print(f\"BODY='{body}'\")
 print(f\"SESSION_ID='{session_id}'\")
+print(f\"WARP_NATIVE={'1' if config.get('warp_native', True) else '0'}\")
 " 2>/dev/null)
 
 # Guard: if Python failed, ENABLED was never set — exit silently
@@ -296,7 +297,7 @@ fi
 # Hook subprocesses may lack a controlling terminal (/dev/tty fails), so we
 # walk the process tree to find the actual TTY device from an ancestor process.
 # Reference: https://github.com/warpdotdev/claude-code-warp
-if [ "${TERM_PROGRAM:-}" = "WarpTerminal" ]; then
+if [ "${TERM_PROGRAM:-}" = "WarpTerminal" ] && [ "$WARP_NATIVE" = "1" ]; then
   # Find the actual TTY device from our process hierarchy
   WARP_TTY=""
   _pid=$$

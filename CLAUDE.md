@@ -39,7 +39,7 @@ Claude Code hooks (defined in `~/.claude/settings.json`) trigger `notify.sh` on 
 The script reads JSON from stdin (hook event data), loads `notify-config.json`, and:
 1. Resolves event key, title, body text
 2. Checks if the event is `enabled` in config — exits if disabled
-3. For Warp: sends notification via OSC 777 escape sequence to `/dev/tty` (Warp handles click-to-focus natively), plays sound, and exits
+3. For Warp (when `warp_native` is true): sends notification via OSC 777 escape sequence to `/dev/tty` (Warp handles click-to-focus natively) and exits; when `warp_native` is false, falls through to the standard terminal-notifier path for rich notifications
 4. For all other terminals: sends notification via `ClaudeNotifications.app` (single app bundle, alert style)
 5. For temporary style: spawns a background dismiss timer (`sleep $TIMEOUT && -remove`)
 6. Plays sound via `afplay` at configured volume (skipped if `sound_enabled` is false)
@@ -76,6 +76,7 @@ Clicking a notification activates the terminal and switches to the correct tab. 
 
 ```json
 {
+  "warp_native": true,
   "default_sound": "Funk",
   "default_volume": 4,
   "default_style": "banner",
@@ -89,6 +90,7 @@ Clicking a notification activates the terminal and switches to the correct tab. 
 }
 ```
 
+- **`warp_native`**: `true`/`false` — when true (default), Warp uses native OSC 777 notifications with tab-aware click-to-focus; when false, Warp uses rich terminal-notifier notifications with custom sound, icon, style, and timeout (click activates Warp at app level only)
 - **`enabled`**: `true`/`false` — skip notification entirely when false
 - **`sound`**: macOS system sound name — Basso, Blow, Bottle, Frog, Funk, Glass, Hero, Morse, Ping, Pop, Purr, Sosumi, Submarine, Tink
 - **`volume`**: slider value 1–20, divided by 10 for `afplay -v` (1=very quiet, 4=default, 10=native volume, 20=loud)
@@ -112,7 +114,7 @@ open /Applications/ClaudeNotifications.app
 python3 ~/.claude/config-ui.py
 ```
 
-This opens a local web page where you can configure all notification settings: enable/disable events, choose sounds, adjust volume, mute sound per event, set persistent vs temporary style, configure dismiss timeout, switch between dark/light themes, and preview notifications. The server auto-shuts down when the browser tab is closed (heartbeat watchdog).
+This opens a local web page where you can configure all notification settings: enable/disable events, choose sounds, adjust volume, mute sound per event, set persistent vs temporary style, configure dismiss timeout, toggle Warp native vs rich notification mode, switch between dark/light themes, and preview notifications. The server auto-shuts down when the browser tab is closed (heartbeat watchdog).
 
 ## Hooks config in settings.json
 
