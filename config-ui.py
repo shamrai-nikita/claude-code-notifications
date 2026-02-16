@@ -52,9 +52,9 @@ DEFAULT_CONFIG = {
     "global_enabled": True,
     "default_timeout": 5,
     "events": {
-        "permission_request": {"enabled": True, "sound": "Funk", "volume": 7, "style": "banner", "sound_enabled": True},
-        "elicitation_dialog": {"enabled": True, "sound": "Glass", "volume": 7, "style": "banner", "sound_enabled": True},
-        "stop": {"enabled": True, "sound": "Hero", "volume": 7, "style": "banner", "sound_enabled": True},
+        "permission_request": {"enabled": True, "sound": "Funk", "volume": 4, "style": "banner", "sound_enabled": True},
+        "elicitation_dialog": {"enabled": True, "sound": "Glass", "volume": 4, "style": "banner", "sound_enabled": True},
+        "stop": {"enabled": True, "sound": "Hero", "volume": 4, "style": "banner", "sound_enabled": True},
     },
 }
 
@@ -640,7 +640,7 @@ function getEventVal(key, field) {
   const evt = (config.events || {})[key] || {};
   if (field === 'enabled') return evt.enabled !== undefined ? evt.enabled : true;
   if (field === 'sound') return evt.sound || 'Funk';
-  if (field === 'volume') return evt.volume !== undefined ? evt.volume : 7;
+  if (field === 'volume') return evt.volume !== undefined ? evt.volume : 4;
   if (field === 'style') return evt.style || 'persistent';
   if (field === 'sound_enabled') return evt.sound_enabled !== undefined ? evt.sound_enabled : true;
   if (field === 'timeout') return evt.timeout !== undefined ? evt.timeout : (config.default_timeout !== undefined ? config.default_timeout : 5);
@@ -1017,7 +1017,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 body = self._read_body()
                 data = json.loads(body)
                 sound = data.get("sound", "Funk")
-                volume = data.get("volume", 7)
+                volume = data.get("volume", 4)
                 style = data.get("style", "persistent")
                 event_key = data.get("event_key")
                 timeout = data.get("timeout", 5)
@@ -1032,7 +1032,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     volume = int(volume)
                     volume = max(1, min(20, volume))
                 except (ValueError, TypeError):
-                    volume = 7
+                    volume = 4
 
                 # Validate style
                 if style not in ("persistent", "banner"):
@@ -1055,7 +1055,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     sound_path = f"/System/Library/Sounds/{sound}.aiff"
                     if os.path.exists(sound_path):
                         subprocess.Popen(
-                            ["afplay", sound_path, "-v", str(volume)],
+                            ["afplay", sound_path, "-v", str(volume / 10.0)],
                             stdout=subprocess.DEVNULL,
                             stderr=subprocess.DEVNULL,
                         )

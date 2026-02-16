@@ -253,13 +253,13 @@ else:
 # Check global kill switch
 if not config.get('global_enabled', True) or not known_event:
     enabled = False
-    sound = 'Funk'; volume = 7; style = 'banner'; sound_enabled = True; timeout = 5
+    sound = 'Funk'; volume = 4; style = 'banner'; sound_enabled = True; timeout = 5
 else:
     # Get per-event config
     evt = events_config.get(event_key, {})
     enabled = evt.get('enabled', event_key in events_config)
     sound = evt.get('sound', 'Funk')
-    volume = evt.get('volume', 7)
+    volume = evt.get('volume', 4)
     style = evt.get('style', 'banner')
     sound_enabled = evt.get('sound_enabled', True)
     timeout = evt.get('timeout', config.get('default_timeout', 5))
@@ -271,7 +271,7 @@ body = body.replace(\"'\", \"'\\\\''\")
 print(f\"EVENT_KEY='{event_key}'\")
 print(f\"ENABLED={'1' if enabled else '0'}\")
 print(f\"SOUND='{sound}'\")
-print(f\"VOLUME={volume}\")
+print(f\"VOLUME={volume / 10.0}\")
 print(f\"STYLE='{style}'\")
 print(f\"SOUND_ENABLED={'1' if sound_enabled else '0'}\")
 print(f\"TIMEOUT={timeout}\")
@@ -287,6 +287,31 @@ fi
 
 # Exit if this event is disabled
 if [ "$ENABLED" = "0" ]; then
+  exit 0
+fi
+
+# --- Warp: use native OSC 777 notifications ---
+# Warp supports OSC 777 escape sequences for notifications. The escape sequence
+# must reach the Warp tab's PTY so Warp can handle click-to-focus natively.
+# Hook subprocesses may lack a controlling terminal (/dev/tty fails), so we
+# walk the process tree to find the actual TTY device from an ancestor process.
+# Reference: https://github.com/warpdotdev/claude-code-warp
+if [ "${TERM_PROGRAM:-}" = "WarpTerminal" ]; then
+  # Find the actual TTY device from our process hierarchy
+  WARP_TTY=""
+  _pid=$$
+  while [ "$_pid" -gt 1 ] 2>/dev/null; do
+    _tty=$(ps -o tty= -p "$_pid" 2>/dev/null | tr -d ' ')
+    if [ -n "$_tty" ] && [ "$_tty" != "??" ]; then
+      WARP_TTY="/dev/$_tty"
+      break
+    fi
+    _pid=$(ps -o ppid= -p "$_pid" 2>/dev/null | tr -d ' ')
+  done
+  if [ -n "$WARP_TTY" ] && [ -w "$WARP_TTY" ]; then
+    printf '\033]777;notify;%s;%s\007' "$TITLE" "$BODY" > "$WARP_TTY" 2>/dev/null || true
+  fi
+  # No afplay — Warp plays its own notification sound for OSC 777
   exit 0
 fi
 

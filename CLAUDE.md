@@ -39,15 +39,16 @@ Claude Code hooks (defined in `~/.claude/settings.json`) trigger `notify.sh` on 
 The script reads JSON from stdin (hook event data), loads `notify-config.json`, and:
 1. Resolves event key, title, body text
 2. Checks if the event is `enabled` in config — exits if disabled
-3. Sends notification via `ClaudeNotifications.app` (single app bundle, alert style)
-4. For temporary style: spawns a background dismiss timer (`sleep $TIMEOUT && -remove`)
-5. Plays sound via `afplay` at configured volume (skipped if `sound_enabled` is false)
+3. For Warp: sends notification via OSC 777 escape sequence to `/dev/tty` (Warp handles click-to-focus natively), plays sound, and exits
+4. For all other terminals: sends notification via `ClaudeNotifications.app` (single app bundle, alert style)
+5. For temporary style: spawns a background dismiss timer (`sleep $TIMEOUT && -remove`)
+6. Plays sound via `afplay` at configured volume (skipped if `sound_enabled` is false)
 
 Clicking a notification activates the terminal and switches to the correct tab. The terminal is auto-detected from `$TERM_PROGRAM`:
 
 | `$TERM_PROGRAM` | Terminal | Tab switching |
 |---|---|---|
-| `WarpTerminal` | Warp | App-level only (no AppleScript support) |
+| `WarpTerminal` | Warp | Full — native OSC 777, Warp handles click-to-focus |
 | `iTerm.app` | iTerm2 | Full — switches to exact session tab via AppleScript |
 | `Apple_Terminal` | Terminal.app | Full — focuses window by TTY via AppleScript |
 | `vscode` | Cursor | App-level only |
@@ -62,7 +63,8 @@ Clicking a notification activates the terminal and switches to the correct tab. 
 - **Custom app bundle**: macOS locks notification icon to the sending app. `-appIcon` flag doesn't work on modern macOS. Solution: copy `terminal-notifier.app`, change bundle ID/name/icon. Uses a custom bell-with-sparkle icon (`icon.png` in repo). Binary is re-signed with `codesign -s - --identifier <bundle-id>` so macOS treats it as a distinct app (not the original `terminal-notifier`). `notify.sh` also passes `-sender <bundle-id>` to reinforce the identity.
 - **Alert style**: Set via `NSUserNotificationAlertStyle = alert` in Info.plist. The "temporary" behavior is achieved via `terminal-notifier -remove GROUP_ID` after a configurable timeout. User must configure in System Settings > Notifications.
 - **Dismiss timer race conditions**: Each new notification kills the previous session's dismiss timer PID (stored in `.dpid` marker files) before sending. PostToolUse/UserPromptSubmit hooks also kill timers. If a timer fires on an already-dismissed notification, `-remove` is a no-op.
-- **Terminal auto-detection**: `notify.sh` reads `$TERM_PROGRAM` to detect the terminal and captures a tab identifier (iTerm2 session ID, Terminal.app TTY). On click, `notify-click.sh` uses AppleScript to switch to the exact tab. Warp lacks AppleScript tab support, so only app-level activation is possible.
+- **Terminal auto-detection**: `notify.sh` reads `$TERM_PROGRAM` to detect the terminal and captures a tab identifier (iTerm2 session ID, Terminal.app TTY). On click, `notify-click.sh` uses AppleScript to switch to the exact tab.
+- **Warp OSC 777 notifications**: Warp doesn't support AppleScript, URI scheme tab focus, or third-party plugins. Instead, we use OSC 777 escape sequences (`\033]777;notify;TITLE;BODY\007`) written to the Warp tab's PTY. Since the notification goes through the tab's PTY, Warp natively knows which tab generated it and handles click-to-focus automatically. Hook subprocesses may lack a controlling terminal (`/dev/tty` fails), so we walk the process tree (`ps -o tty=`) to find the actual TTY device from an ancestor process. This bypasses terminal-notifier entirely for Warp users. Sound is still played via `afplay` with the user's config. Reference: [warpdotdev/claude-code-warp](https://github.com/warpdotdev/claude-code-warp).
 - **`-execute` over `-activate`**: `terminal-notifier` flags are mutually exclusive. We use `-execute` to run `notify-click.sh` on click, which both activates the app and switches tabs. Falls back to no activation flag if terminal is unknown.
 - **Single python3 call**: All JSON parsing (stdin + config file) in one python3 invocation for performance.
 - **Invisible launcher**: `ClaudeNotifications.app` is installed to `/Applications/` (visible in Spotlight/Launchpad). It's a minimal AppleScript app built via `osacompile` at install time. It runs the Python server as a background process (`do shell script ... &`), so no Terminal window is shown — the browser simply opens.
@@ -75,27 +77,27 @@ Clicking a notification activates the terminal and switches to the correct tab. 
 ```json
 {
   "default_sound": "Funk",
-  "default_volume": 7,
+  "default_volume": 4,
   "default_style": "banner",
   "default_sound_enabled": true,
   "default_timeout": 5,
   "events": {
-    "permission_request": { "enabled": true, "sound": "Funk", "volume": 7, "style": "banner", "sound_enabled": true },
-    "elicitation_dialog": { "enabled": true, "sound": "Glass", "volume": 7, "style": "banner", "sound_enabled": true },
-    "stop":               { "enabled": true, "sound": "Hero", "volume": 7, "style": "banner", "sound_enabled": true }
+    "permission_request": { "enabled": true, "sound": "Funk", "volume": 4, "style": "banner", "sound_enabled": true },
+    "elicitation_dialog": { "enabled": true, "sound": "Glass", "volume": 4, "style": "banner", "sound_enabled": true },
+    "stop":               { "enabled": true, "sound": "Hero", "volume": 4, "style": "banner", "sound_enabled": true }
   }
 }
 ```
 
 - **`enabled`**: `true`/`false` — skip notification entirely when false
 - **`sound`**: macOS system sound name — Basso, Blow, Bottle, Frog, Funk, Glass, Hero, Morse, Ping, Pop, Purr, Sosumi, Submarine, Tink
-- **`volume`**: number passed to `afplay -v` (1=quiet, 7=normal, 10=loud, 20=very loud)
+- **`volume`**: slider value 1–20, divided by 10 for `afplay -v` (1=very quiet, 4=default, 10=native volume, 20=loud)
 - **`style`**: `"persistent"` (stays on screen) or `"banner"` (auto-dismisses after timeout)
 - **`sound_enabled`**: `true`/`false` — when false, notification is shown but no sound is played
 - **`timeout`**: seconds before a temporary notification auto-dismisses (1-60, default 5). Only applies when `style` is `"banner"`.
 - **`default_timeout`**: fallback timeout for events that don't specify `timeout` (defaults to `5` if missing)
 - **`default_sound_enabled`**: fallback for events that don't specify `sound_enabled` (defaults to `true` if missing)
-- Per-event settings fall back to `default_sound`/`default_volume`/`default_style`/`default_sound_enabled`/`default_timeout`, then hardcoded defaults (Funk/7/banner/true/5)
+- Per-event settings fall back to `default_sound`/`default_volume`/`default_style`/`default_sound_enabled`/`default_timeout`, then hardcoded defaults (Funk/4/banner/true/5)
 - **Backward compat**: Missing `style`, `sound_enabled`, or `timeout` fields default to their respective `default_*` values. Existing configs work unchanged.
 
 ## Settings UI

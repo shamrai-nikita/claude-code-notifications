@@ -1,7 +1,7 @@
 {
   "global_enabled": true,
   "default_sound": "Funk",
-  "default_volume": 7,
+  "default_volume": 4,
   "default_style": "banner",
   "default_sound_enabled": true,
   "default_timeout": 5,
