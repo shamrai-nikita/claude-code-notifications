@@ -8,7 +8,7 @@ Native macOS notifications when Claude Code needs your attention or finishes a t
 
 ## Why use this
 
-**Works with any terminal** — clicking a notification activates your terminal
+**Tab-level focus** — clicking a notification switches to the exact terminal tab, not just the app. Works with iTerm2, Terminal.app, Warp, Cursor, VS Code, and JetBrains IDEs.
 
 **Customizable** — sound, volume, persistent vs temporary style, notification duration, and enable/disable per event type.
 
@@ -52,6 +52,48 @@ Then run `install.sh` — double-click it in Finder or run from the terminal:
 </details>
 
 ✅ Done — you'll start receiving Claude Code notifications.
+
+## Supported terminals
+
+<details>
+<summary>Show terminal compatibility table</summary>
+
+| Terminal | Tab switching | How |
+|---|---|---|
+| iTerm2 | Yes | AppleScript |
+| Terminal.app | Yes | AppleScript |
+| Warp | Yes | Native OSC 777 (click-to-focus built into Warp) |
+| Cursor | Yes | Lightweight extension (auto-installed) |
+| VS Code | Yes | Lightweight extension (auto-installed) |
+| VSCodium | Yes | Lightweight extension (auto-installed) |
+| JetBrains IDEs | Yes | Lightweight plugin (auto-installed) |
+| Other terminals | App-level only | Activates the terminal app |
+
+</details>
+
+## IDE extensions / Warp Terminal
+
+The installer automatically sets up lightweight extensions for Cursor, VS Code, VSCodium, and JetBrains IDEs. They are completely dormant until a notification is clicked — zero performance impact.
+
+<details>
+<summary>Extension screenshots</summary>
+
+| Cursor / VS Code / VSCodium | JetBrains IDEs |
+|---|---|
+| <img src="images/extension-cursor.png" width="500" alt="Cursor extension"> | <img src="images/extension-jetbrains.png" width="500" alt="JetBrains plugin"> |
+
+</details>
+
+Warp users get native notifications out of the box — no extension needed. Warp handles click-to-focus automatically via OSC 777 escape sequences.
+
+| Permission request | Done |
+|---|---|
+| <img src="images/warp-notification-permission.png" width="350" alt="Warp permission notification"> | <img src="images/warp-notification-done.png" width="350" alt="Warp done notification"> |
+
+You can toggle between native and rich notifications in the Settings UI (Advanced section):
+
+- **Native** (default) — tab-level focus, Warp controls sound and appearance
+- **Rich** — custom sound, icon, style, and timeout, but app-level focus only
 
 ## Settings UI
 
