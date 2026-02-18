@@ -78,14 +78,14 @@ Clicking a notification activates the terminal and switches to the correct tab. 
 {
   "warp_native": true,
   "default_sound": "Funk",
-  "default_volume": 4,
+  "default_volume": 10,
   "default_style": "banner",
   "default_sound_enabled": true,
   "default_timeout": 5,
   "events": {
-    "permission_request": { "enabled": true, "sound": "Funk", "volume": 4, "style": "banner", "sound_enabled": true },
-    "elicitation_dialog": { "enabled": true, "sound": "Glass", "volume": 4, "style": "banner", "sound_enabled": true },
-    "stop":               { "enabled": true, "sound": "Hero", "volume": 4, "style": "banner", "sound_enabled": true }
+    "permission_request": { "enabled": true, "sound": "Funk", "volume": 10, "style": "banner", "sound_enabled": true },
+    "elicitation_dialog": { "enabled": true, "sound": "Glass", "volume": 10, "style": "banner", "sound_enabled": true },
+    "stop":               { "enabled": true, "sound": "Hero", "volume": 10, "style": "banner", "sound_enabled": true }
   }
 }
 ```
@@ -93,13 +93,13 @@ Clicking a notification activates the terminal and switches to the correct tab. 
 - **`warp_native`**: `true`/`false` — when true (default), Warp uses native OSC 777 notifications with tab-aware click-to-focus; when false, Warp uses rich terminal-notifier notifications with custom sound, icon, style, and timeout (click activates Warp at app level only)
 - **`enabled`**: `true`/`false` — skip notification entirely when false
 - **`sound`**: macOS system sound name — Basso, Blow, Bottle, Frog, Funk, Glass, Hero, Morse, Ping, Pop, Purr, Sosumi, Submarine, Tink
-- **`volume`**: slider value 1–20, divided by 10 for `afplay -v` (1=very quiet, 4=default, 10=native volume, 20=loud)
+- **`volume`**: slider value 1–20, divided by 10 for `afplay -v` (1=very quiet, 10=default/native volume, 20=loud)
 - **`style`**: `"persistent"` (stays on screen) or `"banner"` (auto-dismisses after timeout)
 - **`sound_enabled`**: `true`/`false` — when false, notification is shown but no sound is played
 - **`timeout`**: seconds before a temporary notification auto-dismisses (1-60, default 5). Only applies when `style` is `"banner"`.
 - **`default_timeout`**: fallback timeout for events that don't specify `timeout` (defaults to `5` if missing)
 - **`default_sound_enabled`**: fallback for events that don't specify `sound_enabled` (defaults to `true` if missing)
-- Per-event settings fall back to `default_sound`/`default_volume`/`default_style`/`default_sound_enabled`/`default_timeout`, then hardcoded defaults (Funk/4/banner/true/5)
+- Per-event settings fall back to `default_sound`/`default_volume`/`default_style`/`default_sound_enabled`/`default_timeout`, then hardcoded defaults (Funk/10/banner/true/5)
 - **Backward compat**: Missing `style`, `sound_enabled`, or `timeout` fields default to their respective `default_*` values. Existing configs work unchanged.
 
 ## Settings UI

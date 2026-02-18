@@ -253,13 +253,13 @@ else:
 # Check global kill switch
 if not config.get('global_enabled', True) or not known_event:
     enabled = False
-    sound = 'Funk'; volume = 4; style = 'banner'; sound_enabled = True; timeout = 5
+    sound = 'Funk'; volume = 10; style = 'banner'; sound_enabled = True; timeout = 5
 else:
     # Get per-event config
     evt = events_config.get(event_key, {})
     enabled = evt.get('enabled', event_key in events_config)
     sound = evt.get('sound', 'Funk')
-    volume = evt.get('volume', 4)
+    volume = evt.get('volume', 10)
     style = evt.get('style', 'banner')
     sound_enabled = evt.get('sound_enabled', True)
     timeout = evt.get('timeout', config.get('default_timeout', 5))

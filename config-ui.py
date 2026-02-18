@@ -53,9 +53,9 @@ DEFAULT_CONFIG = {
     "warp_native": True,
     "default_timeout": 5,
     "events": {
-        "permission_request": {"enabled": True, "sound": "Funk", "volume": 4, "style": "banner", "sound_enabled": True},
-        "elicitation_dialog": {"enabled": True, "sound": "Glass", "volume": 4, "style": "banner", "sound_enabled": True},
-        "stop": {"enabled": True, "sound": "Hero", "volume": 4, "style": "banner", "sound_enabled": True},
+        "permission_request": {"enabled": True, "sound": "Funk", "volume": 10, "style": "banner", "sound_enabled": True},
+        "elicitation_dialog": {"enabled": True, "sound": "Glass", "volume": 10, "style": "banner", "sound_enabled": True},
+        "stop": {"enabled": True, "sound": "Hero", "volume": 10, "style": "banner", "sound_enabled": True},
     },
 }
 
@@ -316,6 +316,12 @@ HTML_PAGE = r"""<!DOCTYPE html>
     border-radius: 50%;
     border: none;
     cursor: pointer;
+  }
+  .volume-label {
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    white-space: nowrap;
   }
   .volume-val {
     font-size: 0.75rem;
@@ -688,7 +694,7 @@ function getEventVal(key, field) {
   const evt = (config.events || {})[key] || {};
   if (field === 'enabled') return evt.enabled !== undefined ? evt.enabled : true;
   if (field === 'sound') return evt.sound || 'Funk';
-  if (field === 'volume') return evt.volume !== undefined ? evt.volume : 4;
+  if (field === 'volume') return evt.volume !== undefined ? evt.volume : 10;
   if (field === 'style') return evt.style || 'persistent';
   if (field === 'sound_enabled') return evt.sound_enabled !== undefined ? evt.sound_enabled : true;
   if (field === 'timeout') return evt.timeout !== undefined ? evt.timeout : (config.default_timeout !== undefined ? config.default_timeout : 5);
@@ -758,6 +764,7 @@ function render() {
             ${SOUNDS.map(s => `<option value="${s}" ${s===sound?'selected':''}>${s}</option>`).join('')}
           </select>
           <div class="volume-group ${soundCtrlOff?'sound-controls-dim':''}">
+            <span class="volume-label">Volume</span>
             <input type="range" id="vol-${key}" min="1" max="20" value="${volume}" ${soundCtrlOff?'disabled':''}
               oninput="setEventVal('${key}','volume',+this.value);this.nextElementSibling.textContent=this.value">
             <span class="volume-val">${volume}</span>
